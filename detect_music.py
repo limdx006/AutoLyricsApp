@@ -67,7 +67,6 @@ async def sync_song():
 
             currently_playing = (status == PlaybackStatus.PLAYING)
             
-            # Check if this is a new song
             is_new_song = title != current_title or artist != current_artist
             
             if is_new_song:
@@ -79,9 +78,6 @@ async def sync_song():
                 print(f"\n\nNow Playing: {title} - {artist}")
                 print(f"Duration: {format_lrc_time(duration)}")
                 
-                # NEW: Only wait for sync on first run, not on natural song changes
-                # A new song starting at 0 is normal — no stale cache issue
-                # But if song is already playing (position > 5s), might be stale
                 needs_init_wait = not is_initialized and system_pos > 5.0
                 
                 if needs_init_wait:
@@ -109,7 +105,6 @@ async def sync_song():
                     
                     print()
                 else:
-                    # New song or already initialized — trust the position
                     is_initialized = True
                     print(f"Starting at: {format_lrc_time(system_pos)}")
 
@@ -125,7 +120,6 @@ async def sync_song():
                 print("\n===================\n")
 
             else:
-                # Same song — handle pause and normal sync
                 if not currently_playing and not is_paused:
                     is_paused = True
                     paused_position = local_position_at_sync + (time.perf_counter() - last_sync_time)
@@ -150,31 +144,39 @@ async def sync_song():
                     local_now = local_position_at_sync + (time.perf_counter() - last_sync_time)
                     delta_from_last_accepted = system_pos - last_accepted_system_pos
                     
+                    
+                    # 1. Exact same position as last accepted, local moved past it → frozen
                     is_frozen = (
                         abs(delta_from_last_accepted) < 0.1 
                         and local_now > last_accepted_system_pos + 2.0
                     )
                     
+                    # 2. Significant position change (>0.9s from last accepted)
                     is_significant_change = abs(delta_from_last_accepted) > 0.9
                     
                     if is_frozen:
                         print(f"[SYNC] IGNORE frozen | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | last_accepted={format_lrc_time(last_accepted_system_pos)}")
                         
                     elif is_significant_change:
+                        # Calculate where we expect the system to be based on our accurate local timer
+                        # If system is close to local (within 3s), it's an auto-refresh — accept and reset baseline
                         drift_from_local = system_pos - local_now
                         
-                        is_auto_refresh = (
-                            delta_from_last_accepted > 0 
-                            and abs(drift_from_local) < 2.0
-                        )
+                        # Auto-refresh: system finally updated its cache, position matches our timer
+                        is_auto_refresh = abs(drift_from_local) <= 3.0
                         
-                        is_user_seek = (
-                            delta_from_last_accepted < 0 
-                            or abs(drift_from_local) > 2.0
-                        )
+                        # User seek: system jumped to a completely different position
+                        is_user_seek = abs(drift_from_local) > 3.0
                         
                         if is_auto_refresh:
-                            print(f"[SYNC] IGNORE refresh | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | delta_from_last={delta_from_last_accepted:+.2f}s")
+                            # ACCEPT the refresh and reset baseline so frozen detection works correctly
+                            print(f"[SYNC] REFRESH | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={drift_from_local:+.2f}s")
+                            
+                            # Reset baseline to prevent drift accumulation
+                            last_system_position = system_pos
+                            last_sync_time = time.perf_counter()
+                            local_position_at_sync = system_pos
+                            last_accepted_system_pos = system_pos
                             
                         elif is_user_seek:
                             direction = "backward" if delta_from_last_accepted < 0 else "forward"
@@ -184,19 +186,15 @@ async def sync_song():
                             last_sync_time = time.perf_counter()
                             local_position_at_sync = system_pos
                             last_accepted_system_pos = system_pos
-                        else:
-                            print(f"[SYNC] AMBIGUOUS | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={drift_from_local:+.2f}s")
                             
                     else:
+                        # Small change (<0.9s) → trust local timer, no action needed
                         print(f"[SYNC] OK | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={system_pos - local_now:+.2f}s")
 
         else:
             print("[SYNC] No active session found!")
 
         await asyncio.sleep(0.5)
-
-
-
 
 
 async def progress_clock():
@@ -222,7 +220,7 @@ async def progress_clock():
                 )
                 last_print = elapsed
 
-        await precise_sleep(0.01) # Sleep for 100ms to reduce CPU usage while keeping smooth updates
+        await precise_sleep(0.01) # Sleep for 10ms to reduce CPU usage while keeping smooth updates
 
 async def main():
     await asyncio.gather(sync_song(), progress_clock())
