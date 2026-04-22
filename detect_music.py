@@ -15,11 +15,14 @@ last_system_position = 0  # Position at time of last sync
 last_sync_time = 0  # perf_counter() at time of last sync
 max_seen_position = 0  # What our local timer calculated at last sync
 last_accepted_system_pos = 0  # Track last position we actually accepted
+# Pause tracking
 is_paused = False
 paused_position = 0
 pause_start_time = 0
 is_initialized = False
-
+# Lyrics tracking
+lyrics_lines = []      # List of (timestamp_seconds, text) tuples
+current_lyric_index = -1
 
 # Format time as LRC
 def format_lrc_time(seconds):
