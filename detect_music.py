@@ -74,44 +74,52 @@ async def sync_song():
 
             currently_playing = (status == PlaybackStatus.PLAYING)
             
-            # Song changed
-            if title != current_title or artist != current_artist:
+            # Check if this is a new song
+            is_new_song = title != current_title or artist != current_artist
+            
+            if is_new_song:
                 current_title = title
                 current_artist = artist
                 song_duration = duration
                 is_paused = False
-                is_initialized = False  # Reset init for new song
                 
-                # NEW: Wait for first fresh position before starting timer
                 print(f"\n\nNow Playing: {title} - {artist}")
                 print(f"Duration: {format_lrc_time(duration)}")
-                print("Waiting for first sync... (drag timeline or pause/resume to refresh)")
                 
-                # Store initial position and wait for it to change
-                initial_pos = system_pos
-                await asyncio.sleep(0.5)
+                # NEW: Only wait for sync on first run, not on natural song changes
+                # A new song starting at 0 is normal — no stale cache issue
+                # But if song is already playing (position > 5s), might be stale
+                needs_init_wait = not is_initialized and system_pos > 5.0
                 
-                # Poll until position changes significantly
-                while True:
-                    sessions = await MediaManager.request_async()
-                    session = sessions.get_current_session()
-                    if session:
-                        timeline = session.get_timeline_properties()
-                        new_pos = timeline.position.total_seconds()
-                        
-                        if abs(new_pos - initial_pos) > 0.9:
-                            # Fresh position received!
-                            system_pos = new_pos
-                            is_initialized = True
-                            print(f"First sync received: {format_lrc_time(system_pos)}")
-                            break
-                        else:
-                            print(f"\rWaiting... sys={format_lrc_time(new_pos)} | initial={format_lrc_time(initial_pos)}", end="", flush=True)
+                if needs_init_wait:
+                    print("Waiting for first sync... (drag timeline or pause/resume to refresh)")
                     
+                    initial_pos = system_pos
                     await asyncio.sleep(0.5)
-                
-                print()  # newline after waiting
-                
+                    
+                    while True:
+                        sessions = await MediaManager.request_async()
+                        session = sessions.get_current_session()
+                        if session:
+                            timeline = session.get_timeline_properties()
+                            new_pos = timeline.position.total_seconds()
+                            
+                            if abs(new_pos - initial_pos) > 0.9:
+                                system_pos = new_pos
+                                is_initialized = True
+                                print(f"First sync received: {format_lrc_time(system_pos)}")
+                                break
+                            else:
+                                print(f"\rWaiting... sys={format_lrc_time(new_pos)} | initial={format_lrc_time(initial_pos)}", end="", flush=True)
+                        
+                        await asyncio.sleep(0.5)
+                    
+                    print()
+                else:
+                    # New song or already initialized — trust the position
+                    is_initialized = True
+                    print(f"Starting at: {format_lrc_time(system_pos)}")
+
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
                 local_position_at_sync = system_pos
@@ -124,7 +132,7 @@ async def sync_song():
                 print("\n===================\n")
 
             else:
-                # Handle pause state
+                # Same song — handle pause and normal sync
                 if not currently_playing and not is_paused:
                     is_paused = True
                     paused_position = local_position_at_sync + (time.perf_counter() - last_sync_time)
@@ -143,20 +151,18 @@ async def sync_song():
                     print(f"[SYNC] PAUSED | sys={format_lrc_time(system_pos)} | paused_at={format_lrc_time(paused_position)}")
                     
                 elif not is_initialized:
-                    # Still waiting for first sync on this song
                     print(f"\rWaiting for first sync... sys={format_lrc_time(system_pos)}", end="", flush=True)
                     
                 else:
                     local_now = local_position_at_sync + (time.perf_counter() - last_sync_time)
                     delta_from_last_accepted = system_pos - last_accepted_system_pos
                     
-                    # Frozen check
                     is_frozen = (
                         abs(delta_from_last_accepted) < 0.1 
                         and local_now > last_accepted_system_pos + 2.0
                     )
                     
-                    is_significant_change = abs(delta_from_last_accepted) > 0.8
+                    is_significant_change = abs(delta_from_last_accepted) > 0.9
                     
                     if is_frozen:
                         print(f"[SYNC] IGNORE frozen | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | last_accepted={format_lrc_time(last_accepted_system_pos)}")
@@ -195,6 +201,8 @@ async def sync_song():
             print("[SYNC] No active session found!")
 
         await asyncio.sleep(0.5)
+
+
 
 
 
