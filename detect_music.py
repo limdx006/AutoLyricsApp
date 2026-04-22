@@ -159,18 +159,47 @@ class LyricsApp:
             (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
         )
 
-        # Center hint message for initial sync wait
-        self.hint_label = tk.Label(
-            self.lyrics_frame,
-            text=" Waiting for auto sync... \n (might take up to few minutes) \n\n Or you can manually \n Drag the timeline or \n Pause/Resume the song \n to start syncing ",
+        # === CENTER HINT MESSAGE (multiple labels for styling) ===
+        self.hint_container = tk.Frame(self.lyrics_frame, bg=BG_COLOR)
+        self.hint_container.pack(expand=True, fill=tk.BOTH)
+
+        # Top part - normal text
+        self.hint_label_top = tk.Label(
+            self.hint_container,
+            text="Waiting for auto sync...\n(might take up to few minutes)",
             font=("Helvetica", 14),
             bg=BG_COLOR,
             fg="#d6e945",
             wraplength=WINDOW_WIDTH - 60,
             justify=tk.CENTER,
-            pady=20,
+            pady=10,
         )
-        self.hint_label.pack(expand=True, fill=tk.BOTH)
+        self.hint_label_top.pack()
+
+        # Middle part - UNDERLINED
+        self.hint_label_middle = tk.Label(
+            self.hint_container,
+            text="Or you can manually",
+            font=("Helvetica", 16, "underline"),
+            bg=BG_COLOR,
+            fg="#d6e945",
+            wraplength=WINDOW_WIDTH - 60,
+            justify=tk.CENTER,
+        )    
+        self.hint_label_middle.pack()
+
+        # Bottom part - normal text
+        self.hint_label_bottom = tk.Label(
+            self.hint_container,
+            text="Drag the timeline or\nPause/Resume the song\nto start syncing",
+            font=("Helvetica", 14),
+            bg=BG_COLOR,
+            fg="#d6e945",
+            wraplength=WINDOW_WIDTH - 60,
+            justify=tk.CENTER,
+            pady=10,
+        )
+        self.hint_label_bottom.pack()
 
         # Progress bar section - NOW AT BOTTOM
         self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
@@ -249,9 +278,9 @@ class LyricsApp:
     def show_hint(self, show=True):
         """Show or hide the center hint message."""
         if show:
-            self.hint_label.pack(expand=True, fill=tk.BOTH)
+            self.hint_container.pack(expand=True, fill=tk.BOTH)
         else:
-            self.hint_label.pack_forget()
+            self.hint_container.pack_forget()
 
     def clear_lyrics(self):
         for timestamp, label in self.lyric_labels:
