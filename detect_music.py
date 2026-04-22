@@ -42,14 +42,7 @@ def get_synced_lyrics(query):
         return f"Error: {e}"
 
 
-# Sync song timing every 10s
-def get_synced_lyrics(query):
-    try:
-        lrc = syncedlyrics.search(query)
-        return lrc if lrc else "No lyrics found."
-    except Exception as e:
-        return f"Error: {e}"
-
+# Sync song timing
 async def sync_song():
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
