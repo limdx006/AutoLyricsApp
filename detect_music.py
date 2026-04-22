@@ -528,9 +528,10 @@ async def progress_clock(app):
                 app.root.after(0, lambda e=elapsed, d=song_duration: app.update_progress(e, d))
                 last_print = elapsed
 
-            # Update lyrics
+            # Update lyrics with +0.3s offset to compensate for sync delay
             if lyrics_lines:
-                new_index = get_current_lyric_index(elapsed)
+                lyric_elapsed = max(0, elapsed + 0.3)  # Speed up by 0.3s
+                new_index = get_current_lyric_index(lyric_elapsed)
                 if new_index != last_lyric_idx:
                     last_lyric_idx = new_index
                     app.root.after(0, lambda i=new_index: app.highlight_lyric(i))
