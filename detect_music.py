@@ -42,11 +42,18 @@ def get_synced_lyrics(query):
 
 
 # Sync song timing every 10s
+def get_synced_lyrics(query):
+    try:
+        lrc = syncedlyrics.search(query)
+        return lrc if lrc else "No lyrics found."
+    except Exception as e:
+        return f"Error: {e}"
+
 async def sync_song():
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
-    global local_position_at_sync, max_seen_position, last_accepted_system_pos
-    global is_paused, paused_position, pause_start_time
+    global local_position_at_sync, last_accepted_system_pos
+    global is_paused, paused_position
 
     while True:
         sessions = await MediaManager.request_async()
@@ -56,7 +63,6 @@ async def sync_song():
             info = await session.try_get_media_properties_async()
             timeline = session.get_timeline_properties()
             
-            # Get playback status
             playback_info = session.get_playback_info()
             status = playback_info.playback_status
 
@@ -65,7 +71,6 @@ async def sync_song():
             system_pos = timeline.position.total_seconds()
             duration = timeline.end_time.total_seconds()
 
-            # Detect pause/resume
             currently_playing = (status == PlaybackStatus.PLAYING)
             
             # Song changed
@@ -78,7 +83,6 @@ async def sync_song():
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
                 local_position_at_sync = system_pos
-                max_seen_position = system_pos
                 last_accepted_system_pos = system_pos
 
                 print(f"\n\nNow Playing: {title} - {artist}")
@@ -91,65 +95,91 @@ async def sync_song():
                 print("\n===================\n")
 
             else:
-                # NEW: Handle pause state
+                # Handle pause state
                 if not currently_playing and not is_paused:
-                    # Just paused
                     is_paused = True
                     paused_position = local_position_at_sync + (time.perf_counter() - last_sync_time)
-                    pause_start_time = time.perf_counter()
                     print(f"[SYNC] PAUSED at {format_lrc_time(paused_position)}")
                     
                 elif currently_playing and is_paused:
-                    # Just resumed
                     is_paused = False
-                    # Reset sync baseline to the paused position
                     last_system_position = system_pos
                     last_sync_time = time.perf_counter()
-                    local_position_at_sync = paused_position
+                    local_position_at_sync = system_pos
                     last_accepted_system_pos = system_pos
-                    print(f"[SYNC] RESUMED at {format_lrc_time(paused_position)} (system={format_lrc_time(system_pos)})")
-                    continue  # Skip rest of loop, already synced
+                    print(f"[SYNC] RESUMED at {format_lrc_time(system_pos)} (was paused at {format_lrc_time(paused_position)})")
+                    continue
 
-                # If paused, don't do stale detection — frozen position is expected
                 if is_paused:
                     print(f"[SYNC] PAUSED | sys={format_lrc_time(system_pos)} | paused_at={format_lrc_time(paused_position)}")
                     
                 else:
-                    # Normal playback logic
                     local_now = local_position_at_sync + (time.perf_counter() - last_sync_time)
                     
-                    if system_pos > max_seen_position:
-                        max_seen_position = system_pos
+                    # Calculate how much system position changed from last accepted
+                    delta_from_last_accepted = system_pos - last_accepted_system_pos
                     
-                    is_exact_repeat = abs(system_pos - last_accepted_system_pos) < 0.1
-                    looks_stale = (system_pos < local_now - 1.5) and (system_pos >= max_seen_position - 2.0)
-                    is_fresh_low = system_pos < (last_accepted_system_pos - 3.0)
+                    # === NEW LOGIC: 0.5s check with >0.9s threshold ===
                     
-                    if is_exact_repeat:
-                        print(f"[SYNC] IGNORE repeat | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | last_accepted={format_lrc_time(last_accepted_system_pos)}")
+                    # 1. Exact same position as last accepted, local moved past it → frozen
+                    is_frozen = (
+                        abs(delta_from_last_accepted) < 0.1 
+                        and local_now > last_accepted_system_pos + 2.0
+                    )
+                    
+                    # 2. Position changed by >0.9s from last accepted → user interaction or auto-refresh
+                    #    But we need to check if it's a realistic jump
+                    is_significant_change = abs(delta_from_last_accepted) > 0.4
+                    
+                    # 3. If significant change, check if it's moving in same direction as time
+                    #    AND close to what local timer expects → auto-refresh (ignore)
+                    #    OR far from local timer → user seek (accept)
+                    if is_frozen:
+                        print(f"[SYNC] IGNORE frozen | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | last_accepted={format_lrc_time(last_accepted_system_pos)}")
                         
-                    elif looks_stale and not is_fresh_low:
-                        print(f"[SYNC] IGNORE stale | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | max_seen={format_lrc_time(max_seen_position)}")
+                    elif is_significant_change:
+                        # Auto-refresh: system jumps forward by ~5-10s, but local timer is close
+                        # User seek: system jumps to completely different position vs local timer
+                        drift_from_local = system_pos - local_now
                         
-                    elif abs(system_pos - local_now) > 1.5 or is_fresh_low:
-                        direction = "backward" if system_pos < local_now else "forward"
-                        print(f"[SYNC] ACCEPT {direction} | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | delta={system_pos - local_now:+.2f}s")
+                        # If system moved in same direction and local is within 2s → auto-refresh
+                        is_auto_refresh = (
+                            delta_from_last_accepted > 0  # Moved forward
+                            and abs(drift_from_local) < 2.0  # Close to local timer
+                        )
                         
-                        last_system_position = system_pos
-                        last_sync_time = time.perf_counter()
-                        local_position_at_sync = system_pos
-                        last_accepted_system_pos = system_pos
-                        if system_pos > max_seen_position:
-                            max_seen_position = system_pos
+                        # If system moved backward, or jumped far from local → user seek
+                        is_user_seek = (
+                            delta_from_last_accepted < 0  # Backward
+                            or abs(drift_from_local) > 2.0  # Far from local
+                        )
+                        
+                        if is_auto_refresh:
+                            print(f"[SYNC] IGNORE refresh | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | delta_from_last={delta_from_last_accepted:+.2f}s")
+                            
+                        elif is_user_seek:
+                            direction = "backward" if delta_from_last_accepted < 0 else "forward"
+                            print(f"[SYNC] ACCEPT {direction} | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | delta={delta_from_last_accepted:+.2f}s")
+                            
+                            last_system_position = system_pos
+                            last_sync_time = time.perf_counter()
+                            local_position_at_sync = system_pos
+                            last_accepted_system_pos = system_pos
+                        else:
+                            print(f"[SYNC] AMBIGUOUS | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={drift_from_local:+.2f}s")
+                            
                     else:
+                        # Small change (<0.9s) → ignore, trust local timer
                         print(f"[SYNC] OK | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={system_pos - local_now:+.2f}s")
 
         else:
             print("[SYNC] No active session found!")
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.5)
 
-# Fast local timer (0.1s)
+
+
+
 async def progress_clock():
     global local_position_at_sync, last_sync_time, is_paused, paused_position
 
@@ -157,7 +187,6 @@ async def progress_clock():
 
     while True:
         if current_title:
-            # If paused, show frozen position instead of advancing
             if is_paused:
                 elapsed = paused_position
             else:
@@ -174,8 +203,7 @@ async def progress_clock():
                 )
                 last_print = elapsed
 
-        await precise_sleep(0.01)
-
+        await precise_sleep(0.01)  # Sleep for 100ms to reduce CPU usage while keeping smooth updates
 
 async def main():
     await asyncio.gather(sync_song(), progress_clock())
