@@ -1,12 +1,19 @@
 import asyncio
 import syncedlyrics
 import tkinter as tk
+from tkinter import ttk
 import time
 import re
 from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionManager as MediaManager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
+
+# Tkinter default setup for displaying lyrics
+WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 700
+BG_COLOR = "#1a1a2e"  # Dark blue-ish
+ACCENT_COLOR = "#16213e"  # Slightly lighter
 
 # Global variable
 current_title = None
@@ -26,6 +33,7 @@ lyrics_lines = []  # List of (timestamp_seconds, text) tuples
 current_lyric_index = -1
 
 
+"""TIME UTILS - Formatting and parsing for LRC timestamps, plus logic to determine which lyric line to show based on current song position."""
 # Format time as LRC
 def format_lrc_time(seconds):
     minutes = int(seconds // 60)
@@ -33,41 +41,42 @@ def format_lrc_time(seconds):
     return f"[{minutes:02d}:{secs:05.2f}]"
 
 
+# Format time for display without brackets
+def format_display_time(seconds):
+    # Format for display without brackets: MM:SS
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes:02d}:{secs:02d}"
+
+
+"""LYRICS PARSING - Functions to parse LRC lyrics into a structured format and determine which lyric line should be displayed based on the current song position."""
 # Parse LRC format
 def parse_lrc(lrc_text):
-    """Parse LRC format into list of (timestamp_seconds, text) tuples."""
     lines = []
-    pattern = r"\[(\d{2}):(\d{2}\.\d{2,3})\](.*)"
-
-    for line in lrc_text.strip().split("\n"):
+    pattern = r'\[(\d{2}):(\d{2}\.\d{2,3})\](.*)'
+    for line in lrc_text.strip().split('\n'):
         match = re.match(pattern, line.strip())
         if match:
             minutes = int(match.group(1))
-            seconds = float(match.group(2))
-            timestamp = minutes * 60 + seconds
+            sec_ms = float(match.group(2))
+            timestamp = minutes * 60 + sec_ms
             text = match.group(3).strip()
             if text:
                 lines.append((timestamp, text))
-
-    # Sort by timestamp
     lines.sort(key=lambda x: x[0])
     return lines
 
 
 # Load lyrics into global variable
 def get_current_lyric_index(position):
-    """Find the lyric index that should be displayed at given position."""
     if not lyrics_lines:
         return -1
-
-    # Find the last lyric whose timestamp is <= current position
     index = -1
     for i, (timestamp, _) in enumerate(lyrics_lines):
         if timestamp <= position:
             index = i
         else:
             break
-
     return index
 
 
@@ -91,6 +100,208 @@ def display_lyrics(current_index):
     print("\n".join(lines_to_show))
 
 
+"""GUI CLASS - A Tkinter-based GUI to display the current song title, artist, progress bar, and synced lyrics.
+The GUI updates in real-time based on the media session's state and the current position in the song."""
+class LyricsApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Lyrics Player")
+        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+        self.root.configure(bg=BG_COLOR)
+        self.root.resizable(False, False)
+        
+        # Main container - tall rectangle
+        self.main_frame = tk.Frame(root, bg=BG_COLOR, width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        self.main_frame.pack_propagate(False)
+        
+        # Top section - Song info (fixed height)
+        self.info_frame = tk.Frame(self.main_frame, bg=ACCENT_COLOR, height=120)
+        self.info_frame.pack(fill=tk.X, padx=10, pady=10)
+        self.info_frame.pack_propagate(False)
+        
+        # Song title
+        self.title_label = tk.Label(
+            self.info_frame, 
+            text="No song playing", 
+            font=("Helvetica", 16, "bold"),
+            bg=ACCENT_COLOR, 
+            fg="#e94560",  # Pinkish accent
+            wraplength=WINDOW_WIDTH - 40
+        )
+        self.title_label.pack(pady=(20, 5))
+        
+        # Artist
+        self.artist_label = tk.Label(
+            self.info_frame, 
+            text="Waiting...", 
+            font=("Helvetica", 12),
+            bg=ACCENT_COLOR, 
+            fg="#a0a0a0"
+        )
+        self.artist_label.pack()
+        
+        # Progress bar section
+        self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
+        self.progress_frame.pack(fill=tk.X, padx=20, pady=5)
+        self.progress_frame.pack_propagate(False)
+        
+        # Time labels
+        self.current_time_label = tk.Label(
+            self.progress_frame,
+            text="00:00",
+            font=("Helvetica", 10),
+            bg=BG_COLOR,
+            fg="#ffffff"
+        )
+        self.current_time_label.pack(side=tk.LEFT)
+        
+        self.total_time_label = tk.Label(
+            self.progress_frame,
+            text="00:00",
+            font=("Helvetica", 10),
+            bg=BG_COLOR,
+            fg="#ffffff"
+        )
+        self.total_time_label.pack(side=tk.RIGHT)
+        
+        # Progress bar (canvas for custom styling)
+        self.progress_canvas = tk.Canvas(
+            self.main_frame,
+            bg=BG_COLOR,
+            height=6,
+            highlightthickness=0
+        )
+        self.progress_canvas.pack(fill=tk.X, padx=20, pady=(0, 10))
+        
+        # Progress fill
+        self.progress_fill = self.progress_canvas.create_rectangle(
+            0, 0, 0, 6, fill="#e94560", outline=""
+        )
+        
+        # Lyrics section (scrollable)
+        self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
+        self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Canvas for smooth scrolling
+        self.lyrics_canvas = tk.Canvas(
+            self.lyrics_container,
+            bg=BG_COLOR,
+            highlightthickness=0
+        )
+        self.lyrics_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Scrollbar
+        self.scrollbar = ttk.Scrollbar(
+            self.lyrics_container,
+            orient=tk.VERTICAL,
+            command=self.lyrics_canvas.yview
+        )
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.lyrics_canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # Frame inside canvas for lyrics lines
+        self.lyrics_frame = tk.Frame(self.lyrics_canvas, bg=BG_COLOR)
+        self.lyrics_canvas_window = self.lyrics_canvas.create_window(
+            (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
+        )
+        
+        # Bottom status
+        self.status_label = tk.Label(
+            self.main_frame,
+            text="Initializing...",
+            font=("Helvetica", 9),
+            bg=BG_COLOR,
+            fg="#666666"
+        )
+        self.status_label.pack(side=tk.BOTTOM, pady=10)
+        
+        # Store lyric labels for updating
+        self.lyric_labels = []
+        
+        # Bind resize
+        self.lyrics_frame.bind("<Configure>", self.on_frame_configure)
+        self.lyrics_canvas.bind("<Configure>", self.on_canvas_configure)
+        
+    def on_frame_configure(self, event=None):
+        self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
+    
+    def on_canvas_configure(self, event):
+        self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
+    
+    def update_song_info(self, title, artist, duration):
+        self.title_label.config(text=title or "Unknown Title")
+        self.artist_label.config(text=artist or "Unknown Artist")
+        self.total_time_label.config(text=format_display_time(duration))
+    
+    def update_progress(self, current, total):
+        self.current_time_label.config(text=format_display_time(current))
+        
+        # Update progress bar
+        if total > 0:
+            ratio = current / total
+            bar_width = ratio * (WINDOW_WIDTH - 40)
+            self.progress_canvas.coords(self.progress_fill, 0, 0, bar_width, 6)
+    
+    def update_status(self, text):
+        self.status_label.config(text=text)
+    
+    def clear_lyrics(self):
+        # FIX: Unpack tuple to get the label widget
+        for timestamp, label in self.lyric_labels:
+            label.destroy()
+        self.lyric_labels = []
+    
+    def load_lyrics(self, lyrics_data):
+        self.clear_lyrics()
+        
+        for timestamp, text in lyrics_data:
+            label = tk.Label(
+                self.lyrics_frame,
+                text=text,
+                font=("Helvetica", 13),
+                bg=BG_COLOR,
+                fg="#888888",  # Inactive color
+                wraplength=WINDOW_WIDTH - 60,
+                justify=tk.CENTER,
+                pady=8
+            )
+            label.pack(fill=tk.X)
+            self.lyric_labels.append((timestamp, label))
+        
+        self.lyrics_canvas.update_idletasks()
+        self.on_frame_configure()
+    
+    def highlight_lyric(self, index):
+        for i, (timestamp, label) in enumerate(self.lyric_labels):
+            if i == index:
+                label.config(
+                    fg="#ffffff",  # White for active
+                    font=("Helvetica", 15, "bold")
+                )
+                # Scroll to center this line
+                label.update_idletasks()
+                canvas_height = self.lyrics_canvas.winfo_height()
+                label_y = label.winfo_y()
+                label_height = label.winfo_height()
+                scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
+                self.lyrics_canvas.yview_moveto(max(0, scroll_pos / self.lyrics_frame.winfo_height()))
+                
+            elif i == index - 1 or i == index + 1:
+                label.config(
+                    fg="#aaaaaa",  # Light gray for nearby
+                    font=("Helvetica", 13)
+                )
+            else:
+                label.config(
+                    fg="#555555",  # Dark gray for far
+                    font=("Helvetica", 12)
+                )
+
+
+"""ASYNC FUNCTIONS - Main async loops for syncing with the media session and updating the displayed lyrics and timer. 
+Includes logic to handle pauses, seeks, and potential "frozen" states where the media session position isn't updating."""
 # High-precision async sleep for Windows (avoids 15ms asyncio granularity)
 async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
@@ -105,8 +316,7 @@ def get_synced_lyrics(query):
         return f"Error: {e}"
 
 
-# Sync song timing
-async def sync_song():
+async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
     global local_position_at_sync, last_accepted_system_pos
@@ -120,7 +330,7 @@ async def sync_song():
         if session:
             info = await session.try_get_media_properties_async()
             timeline = session.get_timeline_properties()
-
+            
             playback_info = session.get_playback_info()
             status = playback_info.playback_status
 
@@ -129,10 +339,10 @@ async def sync_song():
             system_pos = timeline.position.total_seconds()
             duration = timeline.end_time.total_seconds()
 
-            currently_playing = status == PlaybackStatus.PLAYING
-
+            currently_playing = (status == PlaybackStatus.PLAYING)
+            
             is_new_song = title != current_title or artist != current_artist
-
+            
             if is_new_song:
                 current_title = title
                 current_artist = artist
@@ -140,47 +350,35 @@ async def sync_song():
                 is_paused = False
                 lyrics_lines = []
                 current_lyric_index = -1
-
-                print(f"\n\nNow Playing: {title} - {artist}")
-                print(f"Duration: {format_lrc_time(duration)}")
-
+                
+                # Update GUI
+                app.root.after(0, lambda t=title, a=artist, d=duration: app.update_song_info(t, a, d))
+                app.root.after(0, app.clear_lyrics)
+                app.root.after(0, lambda: app.update_status("Loading lyrics..."))
+                
                 needs_init_wait = not is_initialized and system_pos > 5.0
-
+                
                 if needs_init_wait:
-                    print(
-                        "Waiting for first sync... (drag timeline or pause/resume to refresh)"
-                    )
-
+                    app.root.after(0, lambda: app.update_status("Waiting for sync..."))
+                    
                     initial_pos = system_pos
                     await asyncio.sleep(0.5)
-
+                    
                     while True:
                         sessions = await MediaManager.request_async()
                         session = sessions.get_current_session()
                         if session:
                             timeline = session.get_timeline_properties()
                             new_pos = timeline.position.total_seconds()
-
+                            
                             if abs(new_pos - initial_pos) > 0.9:
                                 system_pos = new_pos
                                 is_initialized = True
-                                print(
-                                    f"First sync received: {format_lrc_time(system_pos)}"
-                                )
                                 break
-                            else:
-                                print(
-                                    f"\rWaiting... sys={format_lrc_time(new_pos)} | initial={format_lrc_time(initial_pos)}",
-                                    end="",
-                                    flush=True,
-                                )
-
+                        
                         await asyncio.sleep(0.5)
-
-                    print()
                 else:
                     is_initialized = True
-                    print(f"Starting at: {format_lrc_time(system_pos)}")
 
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
@@ -191,150 +389,122 @@ async def sync_song():
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
                 lyrics_lines = parse_lrc(lrc_text)
-
-                print("\n===== LYRICS =====\n")
-                if lyrics_lines:
-                    print(f"Loaded {len(lyrics_lines)} lyric lines")
-                else:
-                    print("No synced lyrics found")
-                print("\n===================\n")
+                
+                # Load lyrics into GUI
+                app.root.after(0, lambda l=lyrics_lines: app.load_lyrics(l))
+                app.root.after(0, lambda: app.update_status("Ready"))
 
             else:
                 if not currently_playing and not is_paused:
                     is_paused = True
-                    paused_position = local_position_at_sync + (
-                        time.perf_counter() - last_sync_time
-                    )
-                    print(f"[SYNC] PAUSED at {format_lrc_time(paused_position)}")
-
+                    paused_position = local_position_at_sync + (time.perf_counter() - last_sync_time)
+                    app.root.after(0, lambda: app.update_status("Paused"))
+                    
                 elif currently_playing and is_paused:
                     is_paused = False
                     last_system_position = system_pos
                     last_sync_time = time.perf_counter()
                     local_position_at_sync = system_pos
                     last_accepted_system_pos = system_pos
-                    print(
-                        f"[SYNC] RESUMED at {format_lrc_time(system_pos)} (was paused at {format_lrc_time(paused_position)})"
-                    )
+                    app.root.after(0, lambda: app.update_status("Playing"))
                     continue
 
                 if is_paused:
-                    print(
-                        f"[SYNC] PAUSED | sys={format_lrc_time(system_pos)} | paused_at={format_lrc_time(paused_position)}"
-                    )
-
+                    pass
+                    
                 elif not is_initialized:
-                    print(
-                        f"\rWaiting for first sync... sys={format_lrc_time(system_pos)}",
-                        end="",
-                        flush=True,
-                    )
-
+                    pass
+                    
                 else:
-                    local_now = local_position_at_sync + (
-                        time.perf_counter() - last_sync_time
-                    )
+                    local_now = local_position_at_sync + (time.perf_counter() - last_sync_time)
                     delta_from_last_accepted = system_pos - last_accepted_system_pos
-
+                    
                     is_frozen = (
-                        abs(delta_from_last_accepted) < 0.1
+                        abs(delta_from_last_accepted) < 0.1 
                         and local_now > last_accepted_system_pos + 2.0
                     )
-
+                    
                     is_significant_change = abs(delta_from_last_accepted) > 0.9
-
+                    
                     if is_frozen:
-                        print(
-                            f"[SYNC] IGNORE frozen | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | last_accepted={format_lrc_time(last_accepted_system_pos)}"
-                        )
-
+                        pass
+                        
                     elif is_significant_change:
                         drift_from_local = system_pos - local_now
                         is_auto_refresh = abs(drift_from_local) <= 3.0
                         is_user_seek = abs(drift_from_local) > 3.0
-
+                        
                         if is_auto_refresh:
-                            print(
-                                f"[SYNC] REFRESH | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={drift_from_local:+.2f}s"
-                            )
                             last_system_position = system_pos
                             last_sync_time = time.perf_counter()
                             local_position_at_sync = system_pos
                             last_accepted_system_pos = system_pos
-
+                            
                         elif is_user_seek:
-                            direction = (
-                                "backward"
-                                if delta_from_last_accepted < 0
-                                else "forward"
-                            )
-                            print(
-                                f"[SYNC] ACCEPT {direction} | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | delta={delta_from_last_accepted:+.2f}s"
-                            )
                             last_system_position = system_pos
                             last_sync_time = time.perf_counter()
                             local_position_at_sync = system_pos
                             last_accepted_system_pos = system_pos
-
+                            
                     else:
-                        print(
-                            f"[SYNC] OK | sys={format_lrc_time(system_pos)} | local={format_lrc_time(local_now)} | drift={system_pos - local_now:+.2f}s"
-                        )
+                        pass
 
         else:
-            print("[SYNC] No active session found!")
+            app.root.after(0, lambda: app.update_status("No media session"))
 
-        await asyncio.sleep(0.5)  # Check every 500ms for updates
+        await asyncio.sleep(0.5)
 
 
-async def progress_clock():
+async def progress_clock(app):
     global local_position_at_sync, last_sync_time, is_paused, paused_position, is_initialized
     global current_lyric_index
 
     last_print = -1
-    last_lyric_print = -1
+    last_lyric_idx = -1
 
     while True:
         if current_title and is_initialized:
             if is_paused:
                 elapsed = paused_position
             else:
-                elapsed = local_position_at_sync + (
-                    time.perf_counter() - last_sync_time
-                )
-
+                elapsed = local_position_at_sync + (time.perf_counter() - last_sync_time)
+            
             elapsed = min(elapsed, song_duration)
 
-            # Update timer display
+            # Update progress bar every 100ms
             if int(elapsed * 10) != int(last_print * 10):
-                status_indicator = " ⏸" if is_paused else ""
-                print(
-                    f"\r{format_lrc_time(elapsed)} / {format_lrc_time(song_duration)}{status_indicator}",
-                    end="",
-                    flush=True,
-                )
+                app.root.after(0, lambda e=elapsed, d=song_duration: app.update_progress(e, d))
                 last_print = elapsed
 
-            # Update lyrics display
+            # Update lyrics
             if lyrics_lines:
                 new_index = get_current_lyric_index(elapsed)
-                if new_index != current_lyric_index:
-                    current_lyric_index = new_index
-                    # Print lyrics below the timer
-                    print()  # New line after timer
-                    display_lyrics(current_lyric_index)
-                    # Reprint timer on next line
-                    print(
-                        f"\r{format_lrc_time(elapsed)} / {format_lrc_time(song_duration)}{status_indicator}",
-                        end="",
-                        flush=True,
-                    )
+                if new_index != last_lyric_idx:
+                    last_lyric_idx = new_index
+                    app.root.after(0, lambda i=new_index: app.highlight_lyric(i))
 
-        await precise_sleep(0.1)  # Check lyrics every 100ms for smooth updates
+        await precise_sleep(0.01)  # 10ms for smooth UI updates
 
+"""MAIN FUNCTION - Initializes the Tkinter app and starts the async tasks for syncing with the media session and updating the UI."""
+def main():
+    root = tk.Tk()
+    app = LyricsApp(root)
+    
+    # Start async tasks
+    loop = asyncio.new_event_loop()
+    
+    def run_async():
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(asyncio.gather(
+            sync_song(app),
+            progress_clock(app)
+        ))
+    
+    import threading
+    thread = threading.Thread(target=run_async, daemon=True)
+    thread.start()
+    
+    root.mainloop()
 
-async def main():
-    await asyncio.gather(sync_song(), progress_clock())
-
-
-asyncio.run(main())
+if __name__ == "__main__":
+    main()
