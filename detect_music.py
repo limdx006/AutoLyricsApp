@@ -109,196 +109,216 @@ class LyricsApp:
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.configure(bg=BG_COLOR)
         self.root.resizable(False, False)
-        
+
         # Main container - tall rectangle
-        self.main_frame = tk.Frame(root, bg=BG_COLOR, width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
+        self.main_frame = tk.Frame(
+            root, bg=BG_COLOR, width=WINDOW_WIDTH, height=WINDOW_HEIGHT
+        )
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         self.main_frame.pack_propagate(False)
-        
+
         # Top section - Song info (fixed height)
         self.info_frame = tk.Frame(self.main_frame, bg=ACCENT_COLOR, height=120)
         self.info_frame.pack(fill=tk.X, padx=10, pady=10)
         self.info_frame.pack_propagate(False)
-        
+
         # Song title
         self.title_label = tk.Label(
-            self.info_frame, 
-            text="No song playing", 
+            self.info_frame,
+            text="No song playing",
             font=("Helvetica", 16, "bold"),
-            bg=ACCENT_COLOR, 
+            bg=ACCENT_COLOR,
             fg="#e94560",
-            wraplength=WINDOW_WIDTH - 40
+            wraplength=WINDOW_WIDTH - 40,
         )
         self.title_label.pack(pady=(20, 5))
-        
+
         # Artist
         self.artist_label = tk.Label(
-            self.info_frame, 
-            text="Waiting...", 
+            self.info_frame,
+            text="Waiting...",
             font=("Helvetica", 12),
-            bg=ACCENT_COLOR, 
-            fg="#a0a0a0"
+            bg=ACCENT_COLOR,
+            fg="#a0a0a0",
         )
         self.artist_label.pack()
-        
-        # Lyrics section (scrollable) - NOW ABOVE PROGRESS BAR
+
+        # Lyrics section - NO SCROLLBAR
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
         self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Canvas for smooth scrolling
+
+        # Canvas for lyrics (no scrollbar)
         self.lyrics_canvas = tk.Canvas(
-            self.lyrics_container,
-            bg=BG_COLOR,
-            highlightthickness=0
+            self.lyrics_container, bg=BG_COLOR, highlightthickness=0
         )
-        self.lyrics_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        # Scrollbar
-        self.scrollbar = ttk.Scrollbar(
-            self.lyrics_container,
-            orient=tk.VERTICAL,
-            command=self.lyrics_canvas.yview
-        )
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.lyrics_canvas.configure(yscrollcommand=self.scrollbar.set)
-        
+        self.lyrics_canvas.pack(fill=tk.BOTH, expand=True)
+
         # Frame inside canvas for lyrics lines
         self.lyrics_frame = tk.Frame(self.lyrics_canvas, bg=BG_COLOR)
         self.lyrics_canvas_window = self.lyrics_canvas.create_window(
             (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
         )
-        
+
+        # Center hint message for initial sync wait
+        self.hint_label = tk.Label(
+            self.lyrics_frame,
+            text=" Waiting for auto sync... \n (might take up to few minutes) \n\n Or you can manually \n Drag the timeline or \n Pause/Resume the song \n to start syncing ",
+            font=("Helvetica", 14),
+            bg=BG_COLOR,
+            fg="#d6e945",
+            wraplength=WINDOW_WIDTH - 60,
+            justify=tk.CENTER,
+            pady=20,
+        )
+        self.hint_label.pack(expand=True, fill=tk.BOTH)
+
         # Progress bar section - NOW AT BOTTOM
         self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
         self.progress_frame.pack(fill=tk.X, padx=20, pady=5, side=tk.BOTTOM)
         self.progress_frame.pack_propagate(False)
-        
+
         # Time labels
         self.current_time_label = tk.Label(
             self.progress_frame,
             text="00:00",
             font=("Helvetica", 10),
             bg=BG_COLOR,
-            fg="#ffffff"
+            fg="#ffffff",
         )
         self.current_time_label.pack(side=tk.LEFT)
-        
+
         self.total_time_label = tk.Label(
             self.progress_frame,
             text="00:00",
             font=("Helvetica", 10),
             bg=BG_COLOR,
-            fg="#ffffff"
+            fg="#ffffff",
         )
         self.total_time_label.pack(side=tk.RIGHT)
-        
+
         # Progress bar (canvas for custom styling)
         self.progress_canvas = tk.Canvas(
-            self.main_frame,
-            bg=BG_COLOR,
-            height=6,
-            highlightthickness=0
+            self.main_frame, bg=BG_COLOR, height=6, highlightthickness=0
         )
         self.progress_canvas.pack(fill=tk.X, padx=20, pady=(0, 10), side=tk.BOTTOM)
-        
+
         # Progress fill
         self.progress_fill = self.progress_canvas.create_rectangle(
             0, 0, 0, 6, fill="#e94560", outline=""
         )
-        
+
         # Bottom status
         self.status_label = tk.Label(
             self.main_frame,
             text="Initializing...",
             font=("Helvetica", 9),
             bg=BG_COLOR,
-            fg="#666666"
+            fg="#666666",
         )
         self.status_label.pack(side=tk.BOTTOM, pady=10)
-        
+
         # Store lyric labels for updating
         self.lyric_labels = []
-        
+
         # Bind resize
         self.lyrics_frame.bind("<Configure>", self.on_frame_configure)
         self.lyrics_canvas.bind("<Configure>", self.on_canvas_configure)
-        
+
     def on_frame_configure(self, event=None):
         self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
-    
+
     def on_canvas_configure(self, event):
         self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
-    
+
     def update_song_info(self, title, artist, duration):
         self.title_label.config(text=title or "Unknown Title")
         self.artist_label.config(text=artist or "Unknown Artist")
         self.total_time_label.config(text=format_display_time(duration))
-    
+
     def update_progress(self, current, total):
         self.current_time_label.config(text=format_display_time(current))
-        
-        # Update progress bar
+
         if total > 0:
             ratio = current / total
             bar_width = ratio * (WINDOW_WIDTH - 40)
             self.progress_canvas.coords(self.progress_fill, 0, 0, bar_width, 6)
-    
+
     def update_status(self, text):
         self.status_label.config(text=text)
-    
+
+    def show_hint(self, show=True):
+        """Show or hide the center hint message."""
+        if show:
+            self.hint_label.pack(expand=True, fill=tk.BOTH)
+        else:
+            self.hint_label.pack_forget()
+
     def clear_lyrics(self):
-        # FIX: Unpack tuple to get the label widget
         for timestamp, label in self.lyric_labels:
             label.destroy()
         self.lyric_labels = []
-    
+
     def load_lyrics(self, lyrics_data):
         self.clear_lyrics()
-        
+        self.show_hint(False)  # Hide hint when lyrics load
+
+        # Top spacer to center first lyric
+        top_spacer = tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250)
+        top_spacer.pack(fill=tk.X)
+
         for timestamp, text in lyrics_data:
             label = tk.Label(
                 self.lyrics_frame,
                 text=text,
                 font=("Helvetica", 13),
                 bg=BG_COLOR,
-                fg="#888888",  # Inactive color
+                fg="#888888",
                 wraplength=WINDOW_WIDTH - 60,
                 justify=tk.CENTER,
-                pady=8
+                pady=12,
             )
             label.pack(fill=tk.X)
             self.lyric_labels.append((timestamp, label))
-        
+
+        # Bottom spacer to center last lyric
+        bottom_spacer = tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250)
+        bottom_spacer.pack(fill=tk.X)
+
         self.lyrics_canvas.update_idletasks()
         self.on_frame_configure()
-    
+
     def highlight_lyric(self, index):
         for i, (timestamp, label) in enumerate(self.lyric_labels):
             if i == index:
                 label.config(
-                    fg="#ffffff",  # White for active
+                    fg="#ffffff",
                     font=("Helvetica", 15, "bold")
                 )
-                # Scroll to center this line
                 label.update_idletasks()
                 canvas_height = self.lyrics_canvas.winfo_height()
                 label_y = label.winfo_y()
                 label_height = label.winfo_height()
+
                 scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
-                self.lyrics_canvas.yview_moveto(max(0, scroll_pos / self.lyrics_frame.winfo_height()))
-                
+                max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
+                scroll_pos = max(0, min(scroll_pos, max_scroll))
+
+                self.lyrics_canvas.yview_moveto(
+                    scroll_pos / self.lyrics_frame.winfo_height()
+                    if self.lyrics_frame.winfo_height() > 0
+                    else 0
+                )
+
             elif i == index - 1 or i == index + 1:
                 label.config(
-                    fg="#aaaaaa",  # Light gray for nearby
+                    fg="#aaaaaa",
                     font=("Helvetica", 13)
                 )
             else:
                 label.config(
-                    fg="#555555",  # Dark gray for far
+                    fg="#555555",
                     font=("Helvetica", 12)
                 )
-
 
 """ASYNC FUNCTIONS - Main async loops for syncing with the media session and updating the displayed lyrics and timer. 
 Includes logic to handle pauses, seeks, and potential "frozen" states where the media session position isn't updating."""
@@ -361,6 +381,8 @@ async def sync_song(app):
                 if needs_init_wait:
                     app.root.after(0, lambda: app.update_status("Waiting for sync..."))
                     
+                    app.root.after(0, lambda: app.show_hint(True))  # Show center hint
+                    
                     initial_pos = system_pos
                     await asyncio.sleep(0.5)
                     
@@ -379,6 +401,7 @@ async def sync_song(app):
                         await asyncio.sleep(0.5)
                 else:
                     is_initialized = True
+                    app.root.after(0, lambda: app.show_hint(False))  # Hide hint for new songs
 
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
