@@ -126,7 +126,7 @@ class LyricsApp:
             text="No song playing", 
             font=("Helvetica", 16, "bold"),
             bg=ACCENT_COLOR, 
-            fg="#e94560",  # Pinkish accent
+            fg="#e94560",
             wraplength=WINDOW_WIDTH - 40
         )
         self.title_label.pack(pady=(20, 5))
@@ -141,9 +141,37 @@ class LyricsApp:
         )
         self.artist_label.pack()
         
-        # Progress bar section
+        # Lyrics section (scrollable) - NOW ABOVE PROGRESS BAR
+        self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
+        self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Canvas for smooth scrolling
+        self.lyrics_canvas = tk.Canvas(
+            self.lyrics_container,
+            bg=BG_COLOR,
+            highlightthickness=0
+        )
+        self.lyrics_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Scrollbar
+        self.scrollbar = ttk.Scrollbar(
+            self.lyrics_container,
+            orient=tk.VERTICAL,
+            command=self.lyrics_canvas.yview
+        )
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.lyrics_canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # Frame inside canvas for lyrics lines
+        self.lyrics_frame = tk.Frame(self.lyrics_canvas, bg=BG_COLOR)
+        self.lyrics_canvas_window = self.lyrics_canvas.create_window(
+            (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
+        )
+        
+        # Progress bar section - NOW AT BOTTOM
         self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
-        self.progress_frame.pack(fill=tk.X, padx=20, pady=5)
+        self.progress_frame.pack(fill=tk.X, padx=20, pady=5, side=tk.BOTTOM)
         self.progress_frame.pack_propagate(False)
         
         # Time labels
@@ -172,39 +200,11 @@ class LyricsApp:
             height=6,
             highlightthickness=0
         )
-        self.progress_canvas.pack(fill=tk.X, padx=20, pady=(0, 10))
+        self.progress_canvas.pack(fill=tk.X, padx=20, pady=(0, 10), side=tk.BOTTOM)
         
         # Progress fill
         self.progress_fill = self.progress_canvas.create_rectangle(
             0, 0, 0, 6, fill="#e94560", outline=""
-        )
-        
-        # Lyrics section (scrollable)
-        self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
-        self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Canvas for smooth scrolling
-        self.lyrics_canvas = tk.Canvas(
-            self.lyrics_container,
-            bg=BG_COLOR,
-            highlightthickness=0
-        )
-        self.lyrics_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        # Scrollbar
-        self.scrollbar = ttk.Scrollbar(
-            self.lyrics_container,
-            orient=tk.VERTICAL,
-            command=self.lyrics_canvas.yview
-        )
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.lyrics_canvas.configure(yscrollcommand=self.scrollbar.set)
-        
-        # Frame inside canvas for lyrics lines
-        self.lyrics_frame = tk.Frame(self.lyrics_canvas, bg=BG_COLOR)
-        self.lyrics_canvas_window = self.lyrics_canvas.create_window(
-            (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
         )
         
         # Bottom status
