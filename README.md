@@ -101,6 +101,7 @@ cd AutoLyricsApp
 - Sync may require:
   - waiting a few seconds
   - or manually pausing/resuming
+  - If the timeline wasn't tracked correctly, kindly drag the timeline or pause and resume to refresh it
 
 ---
  
