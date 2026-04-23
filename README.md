@@ -1,1 +1,122 @@
-# AutoLyricsApp
+# 🎵 AutoLyricsApp
+
+A real-time desktop lyrics player built with Python that detects the currently playing music on Windows and displays **synchronised (LRC) lyrics** with smooth timing and a modern GUI.
+
+---
+
+### 🖼 UI Overview
+Top: Song title & artist
+Middle: Centred scrolling lyrics
+Bottom:
+- Progress bar
+- Current time / total time
+- Status indicator
+
+<div style="display: flex; gap: 10px;">
+  <img src="https://github.com/user-attachments/assets/6a7dbfed-9201-4d10-8f37-4a9d87a8ba88" width="48%" />
+  <img src="https://github.com/user-attachments/assets/13d12d5a-4f84-4db7-8265-1d63b15e2fe1" width="48%" />
+</div>
+
+---
+
+## ✨ Features
+
+- 🎧 **Auto-detect currently playing music**
+  - Works with Spotify, YouTube (browser), and other supported apps
+- ⏱ **High-precision playback tracking**
+  - Combines Windows Media session + local timer
+  - Handles drift, pause/resume, and seeking
+- 📜 **Synchronised lyrics (LRC support)**
+  - Automatically fetches timestamped lyrics
+  - Parses and aligns lyrics in real time
+- 🖥 **Modern GUI (Tkinter)**
+  - Clean dark theme
+  - Centred scrolling lyrics
+  - Highlighted current line
+- 🔄 **Real-time updates**
+  - Smooth progress bar
+  - Live lyric highlighting
+- ⏸ **Playback state handling**
+  - Pause / Resume detection
+  - Seek detection (jump forward/backwards)
+- 🧠 **Smart sync logic**
+  - Handles system lag, frozen playback, and timing correction
+
+---
+
+## 🧠 How It Works
+
+This app uses a **hybrid timing system**:
+
+### 1. Windows Media Session (Source of Truth)
+Provides:
+- Song title & artist
+- Playback position
+- Playback status (playing/paused)
+
+### 2. Local High-Precision Timer
+- Uses `time.perf_counter()` for smooth updates
+- Continuously adjusts timing to prevent drift
+
+### 🔁 Sync Strategy
+- Fast loop (~10ms) → UI updates & lyric sync  
+- Slow loop (~0.5s) → drift correction & song detection  
+
+This ensures:
+- ✅ Smooth update  
+- ✅ Accurate timing  
+- ✅ No laggy resets  
+
+---
+
+## 🖼 UI Overview
+
+- **Top:** Song title & artist  
+- **Middle:** Centered scrolling lyrics  
+- **Bottom:**  
+  - Progress bar  
+  - Current time / total time  
+  - Status indicator  
+
+---
+
+## 📦 Installation
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/your-username/AutoLyricsApp.git
+cd AutoLyricsApp
+```
+
+---
+
+### ⚠️ Notes / Limitations
+- Works only on Windows 10/11
+- Requires apps that support system media controls
+- Lyrics depend on availability:
+  - Some songs may not have synced (LRC) lyrics
+- Sync may require:
+  - waiting a few seconds
+  - or manually pausing/resuming
+
+---
+ 
+### 🧩 Project Structure (Conceptual)
+```bash
+main.py
+│
+├── GUI (LyricsApp)
+├── Media Sync (sync_song)
+├── Timer Engine (progress_clock)
+├── Lyrics Parser (parse_lrc)
+└── Utilities (time formatting, helpers)
+```
+
+---
+
+### 📜 License
+This project is mainly for personal use.
+Lyrics are fetched from third-party sources (syncedlyrics library) and may be subject to copyright.
+
+### 👤 Author
+Developed by Lim
