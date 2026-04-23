@@ -51,7 +51,7 @@ This app uses a **hybrid timing system**:
 ### 1. Windows Media Session (Source of Truth)
 Provides:
 - Song title & artist
-- Playback position
+- Playback position (only triggers when user interaction or random timing)
 - Playback status (playing/paused)
 
 ### 2. Local High-Precision Timer
