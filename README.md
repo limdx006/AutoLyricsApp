@@ -87,6 +87,9 @@ This ensures:
 git clone https://github.com/your-username/AutoLyricsApp.git
 cd AutoLyricsApp
 ```
+### 2. Run the program
+- Run the version_1.0.py
+- Run the main.py (separated version of 1.0 for future improvement)
 
 ---
 
