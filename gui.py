@@ -21,6 +21,7 @@ class LyricsApp:
         # Internal state
         self.lyric_labels = []
         self._last_highlight_index = -1
+        self._anim_jobs = {}  # label index -> pending after() id
 
         # Keep lyrics_frame width in sync with canvas width
         self.lyrics_frame.bind("<Configure>", self._on_frame_configure)
@@ -168,6 +169,7 @@ class LyricsApp:
         )
 
     # canvas helpers
+
     def _on_frame_configure(self, event=None):
         self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
 
@@ -175,6 +177,7 @@ class LyricsApp:
         self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
 
     # public update API
+
     def update_song_info(self, title, artist, duration):
         self.title_label.config(text=title or "Unknown Title")
         self.artist_label.config(text=artist or "Unknown Artist")
@@ -206,6 +209,11 @@ class LyricsApp:
             self.hint_container.pack(expand=True, fill=tk.BOTH)
 
     def clear_lyrics(self):
+        # Cancel any in-flight label animations before destroying widgets
+        for job_id in self._anim_jobs.values():
+            self.root.after_cancel(job_id)
+        self._anim_jobs.clear()
+
         # Destroy every widget in lyrics_frame (labels, spacers, hint container)
         for widget in self.lyrics_frame.winfo_children():
             widget.destroy()
@@ -244,28 +252,123 @@ class LyricsApp:
         # Small delay ensures the canvas scroll region is fully committed
         self.lyrics_canvas.after(50, lambda: self.lyrics_canvas.yview_moveto(0))
 
+    # animation helpers
+
+    def _hex_to_rgb(self, hex_color):
+        # Convert #rrggbb to (r, g, b) integers
+        h = hex_color.lstrip("#")
+        return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+
+    def _rgb_to_hex(self, r, g, b):
+        # Convert (r, g, b) integers to #rrggbb string
+        return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
+
+    def _animate_label(
+        self,
+        label_idx,
+        start_color,
+        end_color,
+        start_size,
+        end_size,
+        bold,
+        step,
+        total_steps,
+    ):
+        """Advance one frame of a label's color+size transition, then schedule the next."""
+        if label_idx >= len(self.lyric_labels):
+            return
+
+        t = step / total_steps  # 0.0 → 1.0
+        # Ease-out: fast start, gentle finish
+        t_eased = 1 - (1 - t) ** 2
+
+        sr, sg, sb = self._hex_to_rgb(start_color)
+        er, eg, eb = self._hex_to_rgb(end_color)
+        r = sr + (er - sr) * t_eased
+        g = sg + (eg - sg) * t_eased
+        b = sb + (eb - sb) * t_eased
+        color = self._rgb_to_hex(r, g, b)
+
+        size = round(start_size + (end_size - start_size) * t_eased)
+        font_spec = ("Helvetica", size, "bold") if bold else ("Helvetica", size)
+
+        _, label = self.lyric_labels[label_idx]
+        label.config(fg=color, font=font_spec)
+
+        if step < total_steps:
+            job = self.root.after(
+                15,  # ~15ms per frame ≈ 10 frames over 150ms
+                lambda: self._animate_label(
+                    label_idx,
+                    start_color,
+                    end_color,
+                    start_size,
+                    end_size,
+                    bold,
+                    step + 1,
+                    total_steps,
+                ),
+            )
+            # Cancel any previous animation still running on this label
+            if label_idx in self._anim_jobs:
+                self.root.after_cancel(self._anim_jobs[label_idx])
+            self._anim_jobs[label_idx] = job
+
+    def _start_transition(self, label_idx, end_color, end_size, bold):
+        """Read the label's current color and size, then kick off its animation."""
+        if label_idx >= len(self.lyric_labels):
+            return
+
+        _, label = self.lyric_labels[label_idx]
+
+        # Read current state directly from the widget
+        current_font = label.cget("font")
+        current_color = label.cget("fg")
+
+        # font may come back as a font string "Helvetica 13" or a tuple
+        if isinstance(current_font, tuple):
+            start_size = current_font[1]
+        else:
+            parts = str(current_font).split()
+            start_size = int(parts[1]) if len(parts) > 1 else end_size
+
+        # Cancel any in-flight animation on this label before starting a new one
+        if label_idx in self._anim_jobs:
+            self.root.after_cancel(self._anim_jobs[label_idx])
+            del self._anim_jobs[label_idx]
+
+        self._animate_label(
+            label_idx,
+            current_color,
+            end_color,
+            start_size,
+            end_size,
+            bold,
+            step=1,
+            total_steps=10,
+        )
+
     def highlight_lyric(self, index):
         prev = self._last_highlight_index
 
         if index == prev:
             return
 
-        # Only touch labels whose style actually changes between the two states
+        self._last_highlight_index = index
+
+        # Determine every label whose target style has changed
         affected = set()
         for idx in (prev - 1, prev, prev + 1, index - 1, index, index + 1):
             if 0 <= idx < len(self.lyric_labels):
                 affected.add(idx)
 
         for i in affected:
-            _, label = self.lyric_labels[i]
             if i == index:
-                label.config(fg="#ffffff", font=("Helvetica", 15, "bold"))
+                self._start_transition(i, end_color="#ffffff", end_size=15, bold=True)
             elif i == index - 1 or i == index + 1:
-                label.config(fg="#aaaaaa", font=("Helvetica", 13))
+                self._start_transition(i, end_color="#aaaaaa", end_size=13, bold=False)
             else:
-                label.config(fg="#555555", font=("Helvetica", 12))
-
-        self._last_highlight_index = index
+                self._start_transition(i, end_color="#555555", end_size=12, bold=False)
 
         # Scroll so the active lyric is vertically centred in the canvas
         _, label = self.lyric_labels[index]
