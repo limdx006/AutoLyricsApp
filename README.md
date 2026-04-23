@@ -5,12 +5,12 @@ A real-time desktop lyrics player built with Python that detects the currently p
 ---
 
 ### 🖼 UI Overview
-Top: Song title & artist  
-Middle: Centred scrolling lyrics  
-Bottom:
-- Progress bar
-- Current time / total time
-- Status indicator
+- Top: Song title & artist  
+- Middle: Centred scrolling lyrics  
+- Bottom:
+  - Progress bar
+  - Current time / total time
+  - Status indicator
 
 <div style="display: flex; gap: 10px;">
   <img src="https://github.com/user-attachments/assets/6a7dbfed-9201-4d10-8f37-4a9d87a8ba88" width="48%" />
