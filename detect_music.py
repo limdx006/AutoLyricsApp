@@ -248,6 +248,7 @@ class LyricsApp:
 
         # Store lyric labels for updating
         self.lyric_labels = []
+        self._last_highlight_index = -1
 
         # Bind resize
         self.lyrics_frame.bind("<Configure>", self.on_frame_configure)
@@ -283,9 +284,12 @@ class LyricsApp:
             self.hint_container.pack_forget()
 
     def clear_lyrics(self):
-        for timestamp, label in self.lyric_labels:
-            label.destroy()
+        # Destroy every widget in lyrics_frame (labels, spacers, hint container)
+        for widget in self.lyrics_frame.winfo_children():
+            widget.destroy()
         self.lyric_labels = []
+        self._last_highlight_index = -1
+        self.lyrics_canvas.yview_moveto(0)
 
     def load_lyrics(self, lyrics_data):
         self.clear_lyrics()
@@ -313,41 +317,53 @@ class LyricsApp:
         bottom_spacer = tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250)
         bottom_spacer.pack(fill=tk.X)
 
+        # Force complete UI update before scrolling
+        self.lyrics_frame.update_idletasks()
         self.lyrics_canvas.update_idletasks()
         self.on_frame_configure()
 
+        # Reset scroll to top - use after to ensure canvas is ready
+        self.lyrics_canvas.after(50, lambda: self.lyrics_canvas.yview_moveto(0))
+
     def highlight_lyric(self, index):
-        for i, (timestamp, label) in enumerate(self.lyric_labels):
+        prev = self._last_highlight_index
+
+        if index == prev:
+            return
+
+        # Indices whose visual style may change between the two states
+        affected = set()
+        for idx in (prev - 1, prev, prev + 1, index - 1, index, index + 1):
+            if 0 <= idx < len(self.lyric_labels):
+                affected.add(idx)
+
+        for i in affected:
+            _, label = self.lyric_labels[i]
             if i == index:
-                label.config(
-                    fg="#ffffff",
-                    font=("Helvetica", 15, "bold")
-                )
-                label.update_idletasks()
-                canvas_height = self.lyrics_canvas.winfo_height()
-                label_y = label.winfo_y()
-                label_height = label.winfo_height()
-
-                scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
-                max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
-                scroll_pos = max(0, min(scroll_pos, max_scroll))
-
-                self.lyrics_canvas.yview_moveto(
-                    scroll_pos / self.lyrics_frame.winfo_height()
-                    if self.lyrics_frame.winfo_height() > 0
-                    else 0
-                )
-
+                label.config(fg="#ffffff", font=("Helvetica", 15, "bold"))
             elif i == index - 1 or i == index + 1:
-                label.config(
-                    fg="#aaaaaa",
-                    font=("Helvetica", 13)
-                )
+                label.config(fg="#aaaaaa", font=("Helvetica", 13))
             else:
-                label.config(
-                    fg="#555555",
-                    font=("Helvetica", 12)
-                )
+                label.config(fg="#555555", font=("Helvetica", 12))
+
+        self._last_highlight_index = index
+
+        # Scroll so the active lyric is centered
+        _, label = self.lyric_labels[index]
+        label.update_idletasks()
+        canvas_height = self.lyrics_canvas.winfo_height()
+        label_y = label.winfo_y()
+        label_height = label.winfo_height()
+
+        scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
+        max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
+        scroll_pos = max(0, min(scroll_pos, max_scroll))
+
+        self.lyrics_canvas.yview_moveto(
+            scroll_pos / self.lyrics_frame.winfo_height()
+            if self.lyrics_frame.winfo_height() > 0
+            else 0
+        )
 
 """ASYNC FUNCTIONS - Main async loops for syncing with the media session and updating the displayed lyrics and timer. 
 Includes logic to handle pauses, seeks, and potential "frozen" states where the media session position isn't updating."""
