@@ -15,7 +15,6 @@ class LyricsApp:
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
-        self._build_hint_message()
         self._build_progress_bar()
 
         # Internal state
@@ -81,49 +80,6 @@ class LyricsApp:
             (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
         )
 
-    def _build_hint_message(self):
-        """Three-part hint shown while waiting for the first sync event."""
-        self.hint_container = tk.Frame(self.lyrics_frame, bg=BG_COLOR)
-        self.hint_container.pack(expand=True, fill=tk.BOTH)
-
-        # Top part - normal text
-        self.hint_label_top = tk.Label(
-            self.hint_container,
-            text="Waiting for auto sync...\n(might take up to few minutes)",
-            font=("Helvetica", 14),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-            pady=10,
-        )
-        self.hint_label_top.pack()
-
-        # Middle part - underlined
-        self.hint_label_middle = tk.Label(
-            self.hint_container,
-            text="Or you can manually",
-            font=("Helvetica", 16, "underline"),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-        )
-        self.hint_label_middle.pack()
-
-        # Bottom part - normal text
-        self.hint_label_bottom = tk.Label(
-            self.hint_container,
-            text="Drag the timeline or\nPause/Resume the song\nto start syncing",
-            font=("Helvetica", 14),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-            pady=10,
-        )
-        self.hint_label_bottom.pack()
-
     def _build_progress_bar(self):
         # Status text sits at the very bottom
         self.status_label = tk.Label(
@@ -162,7 +118,7 @@ class LyricsApp:
         self.pause_btn = tk.Label(
             self.progress_frame,
             text="▌▌",
-            font=("Helvetica", 10),
+            font=("Helvetica", 18),
             bg=BG_COLOR,
             fg="#ffffff",
             cursor="hand2",
@@ -217,26 +173,8 @@ class LyricsApp:
             self._pause_callback()
 
     def set_pause_button_state(self, is_paused):
-        # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
-        if is_paused:
-            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
-        else:
-            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
-
-    def show_hint(self, show=True):
-        """Show or hide the center hint message.
-        Rebuilds the widgets if they were destroyed by a previous clear_lyrics call."""
-        if not show:
-            # Only hide if the container still exists
-            if self.hint_container.winfo_exists():
-                self.hint_container.pack_forget()
-            return
-
-        # Rebuild the hint container if it was destroyed by clear_lyrics
-        if not self.hint_container.winfo_exists():
-            self._build_hint_message()
-        else:
-            self.hint_container.pack(expand=True, fill=tk.BOTH)
+        # Show ▶ when paused (click to resume) and ▌▌ when playing (click to pause)
+        self.pause_btn.config(text="▶" if is_paused else "▌▌", fg="#ffffff")
 
     def clear_lyrics(self):
         # Cancel any in-flight label animations before destroying widgets

@@ -118,7 +118,6 @@ async def sync_song(app):
 
                 if needs_init_wait:
                     app.root.after(0, lambda: app.update_status("Syncing..."))
-                    app.root.after(0, lambda: app.show_hint(True))
 
                     """AUTO NUDGE - Windows only updates the media session timeline position
                     when playback state changes (play/pause/seek). On app startup the position
@@ -143,10 +142,8 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     is_initialized = True
-                    app.root.after(0, lambda: app.show_hint(False))
                 else:
                     is_initialized = True
-                    app.root.after(0, lambda: app.show_hint(False))
 
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
