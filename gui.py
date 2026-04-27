@@ -1,7 +1,7 @@
 import tkinter as tk
 
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, BG_COLOR, ACCENT_COLOR
-from lyrics_utils import format_display_time
+from lyrics_utils import format_display_time, COLOR_MAP
 
 
 """GUI - Tkinter window that displays the current song, a progress bar, and synced lyrics.
@@ -15,13 +15,22 @@ class LyricsApp:
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
-        self._build_hint_message()
         self._build_progress_bar()
 
         # Internal state
         self.lyric_labels = []
         self._last_highlight_index = -1
         self._anim_jobs = {}  # label index -> pending after() id
+        self._last_scroll_y = (
+            -1
+        )  # Track last scroll position to avoid redundant scrolls
+
+        # Pre-computed animation constants (avoid hex↔rgb conversion every frame)
+        self._colors = {
+            "active": COLOR_MAP["#ffffff"],
+            "nearby": COLOR_MAP["#aaaaaa"],
+            "far": COLOR_MAP["#555555"],
+        }
 
         # Keep lyrics_frame width in sync with canvas width
         self.lyrics_frame.bind("<Configure>", self._on_frame_configure)
@@ -42,7 +51,6 @@ class LyricsApp:
         self.main_frame.pack_propagate(False)
 
     def _build_info_panel(self):
-        # Top section - song title and artist (fixed height)
         self.info_frame = tk.Frame(self.main_frame, bg=ACCENT_COLOR, height=120)
         self.info_frame.pack(fill=tk.X, padx=10, pady=10)
         self.info_frame.pack_propagate(False)
@@ -67,7 +75,6 @@ class LyricsApp:
         self.artist_label.pack()
 
     def _build_lyrics_panel(self):
-        # Scrollable canvas area that holds all lyric labels
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
         self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -81,51 +88,7 @@ class LyricsApp:
             (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
         )
 
-    def _build_hint_message(self):
-        """Three-part hint shown while waiting for the first sync event."""
-        self.hint_container = tk.Frame(self.lyrics_frame, bg=BG_COLOR)
-        self.hint_container.pack(expand=True, fill=tk.BOTH)
-
-        # Top part - normal text
-        self.hint_label_top = tk.Label(
-            self.hint_container,
-            text="Waiting for auto sync...\n(might take up to few minutes)",
-            font=("Helvetica", 14),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-            pady=10,
-        )
-        self.hint_label_top.pack()
-
-        # Middle part - underlined
-        self.hint_label_middle = tk.Label(
-            self.hint_container,
-            text="Or you can manually",
-            font=("Helvetica", 16, "underline"),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-        )
-        self.hint_label_middle.pack()
-
-        # Bottom part - normal text
-        self.hint_label_bottom = tk.Label(
-            self.hint_container,
-            text="Drag the timeline or\nPause/Resume the song\nto start syncing",
-            font=("Helvetica", 14),
-            bg=BG_COLOR,
-            fg="#d6e945",
-            wraplength=WINDOW_WIDTH - 60,
-            justify=tk.CENTER,
-            pady=10,
-        )
-        self.hint_label_bottom.pack()
-
     def _build_progress_bar(self):
-        # Status text sits at the very bottom
         self.status_label = tk.Label(
             self.main_frame,
             text="Initializing...",
@@ -135,7 +98,6 @@ class LyricsApp:
         )
         self.status_label.pack(side=tk.BOTTOM, pady=10)
 
-        # Time labels flank the progress bar
         self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
         self.progress_frame.pack(fill=tk.X, padx=20, pady=5, side=tk.BOTTOM)
         self.progress_frame.pack_propagate(False)
@@ -158,7 +120,19 @@ class LyricsApp:
         )
         self.total_time_label.pack(side=tk.RIGHT)
 
-        # Thin coloured bar drawn on a canvas for custom styling
+        self.pause_btn = tk.Label(
+            self.progress_frame,
+            text="▌▌",
+            font=("Helvetica", 10),
+            bg=BG_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.pause_btn.pack(expand=True)
+        self.pause_btn.bind("<Button-1>", lambda e: self._on_pause_btn_clicked())
+        self.pause_btn.bind("<Enter>", lambda e: self.pause_btn.config(fg="#e94560"))
+        self.pause_btn.bind("<Leave>", lambda e: self.pause_btn.config(fg="#ffffff"))
+
         self.progress_canvas = tk.Canvas(
             self.main_frame, bg=BG_COLOR, height=6, highlightthickness=0
         )
@@ -193,36 +167,53 @@ class LyricsApp:
     def update_status(self, text):
         self.status_label.config(text=text)
 
-    def show_hint(self, show=True):
-        """Show or hide the center hint message.
-        Rebuilds the widgets if they were destroyed by a previous clear_lyrics call."""
-        if not show:
-            # Only hide if the container still exists
-            if self.hint_container.winfo_exists():
-                self.hint_container.pack_forget()
-            return
+    def set_pause_callback(self, callback):
+        self._pause_callback = callback
 
-        # Rebuild the hint container if it was destroyed by clear_lyrics
-        if not self.hint_container.winfo_exists():
-            self._build_hint_message()
+    def _on_pause_btn_clicked(self):
+        if hasattr(self, "_pause_callback") and self._pause_callback:
+            self._pause_callback()
+
+    def set_pause_button_state(self, is_paused):
+        # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
+        if is_paused:
+            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
         else:
-            self.hint_container.pack(expand=True, fill=tk.BOTH)
+            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
+
 
     def clear_lyrics(self):
-        # Cancel any in-flight label animations before destroying widgets
+        # Cancel any in-flight label animations
         for job_id in self._anim_jobs.values():
             self.root.after_cancel(job_id)
         self._anim_jobs.clear()
 
-        # Destroy every widget in lyrics_frame (labels, spacers, hint container)
         for widget in self.lyrics_frame.winfo_children():
             widget.destroy()
         self.lyric_labels = []
         self._last_highlight_index = -1
+        self._last_scroll_y = -1
         self.lyrics_canvas.yview_moveto(0)
 
     def load_lyrics(self, lyrics_data):
         self.clear_lyrics()
+
+        # Show "no lyrics" message if empty
+        if not lyrics_data:
+            no_lyrics_label = tk.Label(
+                self.lyrics_frame,
+                text="No lyrics found\n\nTry a different song",
+                font=("Helvetica", 14),
+                bg=BG_COLOR,
+                fg="#e94560",
+                wraplength=WINDOW_WIDTH - 60,
+                justify=tk.CENTER,
+                pady=20,
+            )
+            no_lyrics_label.pack(expand=True, fill=tk.BOTH)
+            self.lyrics_frame.update_idletasks()
+            self._on_frame_configure()
+            return
 
         # Top spacer keeps the first lyric centred on screen
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
@@ -244,46 +235,37 @@ class LyricsApp:
         # Bottom spacer keeps the last lyric centred on screen
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
 
-        # Force layout recalculation before resetting scroll
         self.lyrics_frame.update_idletasks()
-        self.lyrics_canvas.update_idletasks()
         self._on_frame_configure()
 
         # Small delay ensures the canvas scroll region is fully committed
         self.lyrics_canvas.after(50, lambda: self.lyrics_canvas.yview_moveto(0))
 
-    # animation helpers
-
-    def _hex_to_rgb(self, hex_color):
-        # Convert #rrggbb to (r, g, b) integers
-        h = hex_color.lstrip("#")
-        return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+    # animation helpers - OPTIMIZED
 
     def _rgb_to_hex(self, r, g, b):
-        # Convert (r, g, b) integers to #rrggbb string
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
 
     def _animate_label(
         self,
         label_idx,
-        start_color,
-        end_color,
+        start_rgb,
+        end_rgb,
         start_size,
         end_size,
         bold,
         step,
         total_steps,
     ):
-        """Advance one frame of a label's color+size transition, then schedule the next."""
+        """Advance one frame of a label's color+size transition."""
         if label_idx >= len(self.lyric_labels):
             return
 
-        t = step / total_steps  # 0.0 → 1.0
-        # Ease-out: fast start, gentle finish
-        t_eased = 1 - (1 - t) ** 2
+        t = step / total_steps
+        t_eased = 1 - (1 - t) ** 2  # Ease-out
 
-        sr, sg, sb = self._hex_to_rgb(start_color)
-        er, eg, eb = self._hex_to_rgb(end_color)
+        sr, sg, sb = start_rgb
+        er, eg, eb = end_rgb
         r = sr + (er - sr) * t_eased
         g = sg + (eg - sg) * t_eased
         b = sb + (eb - sb) * t_eased
@@ -296,56 +278,52 @@ class LyricsApp:
         label.config(fg=color, font=font_spec)
 
         if step < total_steps:
-            job = self.root.after(
-                15,  # ~15ms per frame ≈ 10 frames over 150ms
-                lambda: self._animate_label(
-                    label_idx,
-                    start_color,
-                    end_color,
-                    start_size,
-                    end_size,
-                    bold,
-                    step + 1,
-                    total_steps,
-                ),
-            )
-            # Cancel any previous animation still running on this label
+            # OPTIMIZATION: Store callback reference to avoid lambda creation overhead
+            # Use a bound method with args stored in closure
+            def next_frame(
+                idx=label_idx,
+                sr=start_rgb,
+                er=end_rgb,
+                ss=start_size,
+                es=end_size,
+                b=bold,
+                s=step + 1,
+                ts=total_steps,
+            ):
+                self._animate_label(idx, sr, er, ss, es, b, s, ts)
+
+            job = self.root.after(15, next_frame)
+
             if label_idx in self._anim_jobs:
                 self.root.after_cancel(self._anim_jobs[label_idx])
             self._anim_jobs[label_idx] = job
 
-    def _start_transition(self, label_idx, end_color, end_size, bold):
-        """Read the label's current color and size, then kick off its animation."""
+    def _start_transition(self, label_idx, end_color_name, end_size, bold):
+        """Read current state and kick off animation using pre-computed RGB values."""
         if label_idx >= len(self.lyric_labels):
             return
 
         _, label = self.lyric_labels[label_idx]
 
-        # Read current state directly from the widget
+        # OPTIMIZATION: Parse font once, store base size
         current_font = label.cget("font")
-        current_color = label.cget("fg")
-
-        # font may come back as a font string "Helvetica 13" or a tuple
         if isinstance(current_font, tuple):
             start_size = current_font[1]
         else:
             parts = str(current_font).split()
             start_size = int(parts[1]) if len(parts) > 1 else end_size
 
-        # Cancel any in-flight animation on this label before starting a new one
+        current_color = label.cget("fg")
+        # Map current color to RGB (fallback to far color if unknown)
+        start_rgb = COLOR_MAP.get(current_color, COLOR_MAP["#555555"])
+        end_rgb = self._colors[end_color_name]
+
         if label_idx in self._anim_jobs:
             self.root.after_cancel(self._anim_jobs[label_idx])
             del self._anim_jobs[label_idx]
 
         self._animate_label(
-            label_idx,
-            current_color,
-            end_color,
-            start_size,
-            end_size,
-            bold,
-            step=1,
-            total_steps=10,
+            label_idx, start_rgb, end_rgb, start_size, end_size, bold, 1, 10
         )
 
     def highlight_lyric(self, index):
@@ -356,7 +334,6 @@ class LyricsApp:
 
         self._last_highlight_index = index
 
-        # Determine every label whose target style has changed
         affected = set()
         for idx in (prev - 1, prev, prev + 1, index - 1, index, index + 1):
             if 0 <= idx < len(self.lyric_labels):
@@ -364,15 +341,14 @@ class LyricsApp:
 
         for i in affected:
             if i == index:
-                self._start_transition(i, end_color="#ffffff", end_size=15, bold=True)
+                self._start_transition(i, "active", 15, True)
             elif i == index - 1 or i == index + 1:
-                self._start_transition(i, end_color="#aaaaaa", end_size=13, bold=False)
+                self._start_transition(i, "nearby", 13, False)
             else:
-                self._start_transition(i, end_color="#555555", end_size=12, bold=False)
+                self._start_transition(i, "far", 12, False)
 
-        # Scroll so the active lyric is vertically centred in the canvas
+        # Scroll so the active lyric is vertically centred
         _, label = self.lyric_labels[index]
-        label.update_idletasks()
         canvas_height = self.lyrics_canvas.winfo_height()
         label_y = label.winfo_y()
         label_height = label.winfo_height()
@@ -381,8 +357,12 @@ class LyricsApp:
         max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
         scroll_pos = max(0, min(scroll_pos, max_scroll))
 
-        self.lyrics_canvas.yview_moveto(
+        # OPTIMIZATION: Skip scroll if position hasn't changed meaningfully
+        scroll_ratio = (
             scroll_pos / self.lyrics_frame.winfo_height()
             if self.lyrics_frame.winfo_height() > 0
             else 0
         )
+        if abs(scroll_ratio - self._last_scroll_y) > 0.01:  # Only scroll if >1% change
+            self._last_scroll_y = scroll_ratio
+            self.lyrics_canvas.yview_moveto(scroll_ratio)

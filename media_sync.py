@@ -28,12 +28,10 @@ last_accepted_system_pos = 0
 # Pause tracking
 is_paused = False
 paused_position = 0
-pause_start_time = 0
 is_initialized = False
 
 # Parsed lyrics for the current track
-lyrics_lines = []  # List of (timestamp_seconds, text) tuples
-current_lyric_index = -1
+lyrics_lines = []
 
 
 # High-precision async sleep for Windows (avoids 15ms asyncio granularity)
@@ -45,23 +43,36 @@ async def precise_sleep(sleep_for: float) -> None:
 def get_synced_lyrics(query):
     try:
         lrc = syncedlyrics.search(query)
-        return lrc if lrc else "No lyrics found."
-    except Exception as e:
-        return f"Error: {e}"
+        return lrc if lrc else None  # Return None instead of string for cleaner handling
+    except Exception:
+        return None
+
+
+async def _toggle_play_pause_async():
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        await session.try_toggle_play_pause_async()
+
+
+def register_pause_button(app, loop):
+    """Wire the GUI pause button to the async toggle."""
+    def on_click():
+        asyncio.run_coroutine_threadsafe(_toggle_play_pause_async(), loop)
+
+    app.set_pause_callback(on_click)
 
 
 """SYNC SONG - Polls the Windows media session every 500ms to detect song changes,
 pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
 The timeline correction logic below must not be modified — it handles the irregular
 update cadence of the Windows media session API."""
-
-
 async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
     global local_position_at_sync, last_accepted_system_pos
     global is_paused, paused_position, is_initialized
-    global lyrics_lines, current_lyric_index
+    global lyrics_lines
 
     while True:
         sessions = await MediaManager.request_async()
@@ -87,7 +98,6 @@ async def sync_song(app):
                 song_duration = duration
                 is_paused = False
                 lyrics_lines = []
-                current_lyric_index = -1
 
                 # Refresh song header and clear old lyrics immediately
                 app.root.after(
@@ -100,27 +110,30 @@ async def sync_song(app):
                 needs_init_wait = not is_initialized and system_pos > 5.0
 
                 if needs_init_wait:
-                    # Wait until the system position actually moves before trusting it
-                    app.root.after(0, lambda: app.update_status("Waiting for sync..."))
-                    app.root.after(0, lambda: app.show_hint(True))
+                    app.root.after(0, lambda: app.update_status("Syncing..."))
 
-                    initial_pos = system_pos
-                    await asyncio.sleep(0.5)
+                    # Auto-nudge: pause then resume to force fresh position
+                    await session.try_pause_async()
+                    await asyncio.sleep(0.2)
 
-                    while True:
-                        sessions = await MediaManager.request_async()
-                        session = sessions.get_current_session()
-                        if session:
-                            timeline = session.get_timeline_properties()
-                            new_pos = timeline.position.total_seconds()
-                            if abs(new_pos - initial_pos) > 0.9:
-                                system_pos = new_pos
-                                is_initialized = True
-                                break
-                        await asyncio.sleep(0.5)
+                    sessions = await MediaManager.request_async()
+                    session = sessions.get_current_session()
+                    if session:
+                        timeline = session.get_timeline_properties()
+                        system_pos = timeline.position.total_seconds()
+
+                    await session.try_play_async()
+                    await asyncio.sleep(0.2)
+
+                    sessions = await MediaManager.request_async()
+                    session = sessions.get_current_session()
+                    if session:
+                        timeline = session.get_timeline_properties()
+                        system_pos = timeline.position.total_seconds()
+
+                    is_initialized = True
                 else:
                     is_initialized = True
-                    app.root.after(0, lambda: app.show_hint(False))
 
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
@@ -130,9 +143,16 @@ async def sync_song(app):
                 # Fetch and parse lyrics, then hand them to the GUI
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
-                lyrics_lines = parse_lrc(lrc_text)
+                
+                # FIX: Handle None return cleanly
+                if lrc_text:
+                    lyrics_lines = parse_lrc(lrc_text)
+                else:
+                    lyrics_lines = []
 
-                app.root.after(0, lambda l=lyrics_lines: app.load_lyrics(l))
+                # FIX: Pass a COPY of lyrics_lines to avoid race condition
+                lyrics_snapshot = lyrics_lines.copy()
+                app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l))
                 app.root.after(0, lambda: app.update_status("Ready"))
 
             else:
@@ -143,6 +163,7 @@ async def sync_song(app):
                         time.perf_counter() - last_sync_time
                     )
                     app.root.after(0, lambda: app.update_status("Paused"))
+                    app.root.after(0, lambda: app.set_pause_button_state(True))
 
                 elif currently_playing and is_paused:
                     is_paused = False
@@ -151,15 +172,12 @@ async def sync_song(app):
                     local_position_at_sync = system_pos
                     last_accepted_system_pos = system_pos
                     app.root.after(0, lambda: app.update_status("Playing"))
+                    app.root.after(0, lambda: app.set_pause_button_state(False))
                     continue
 
                 # timeline correction (do not modify)
-                if is_paused:
+                if is_paused or not is_initialized:
                     pass
-
-                elif not is_initialized:
-                    pass
-
                 else:
                     local_now = local_position_at_sync + (
                         time.perf_counter() - last_sync_time
@@ -181,13 +199,7 @@ async def sync_song(app):
                         is_auto_refresh = abs(drift_from_local) <= 3.0
                         is_user_seek = abs(drift_from_local) > 3.0
 
-                        if is_auto_refresh:
-                            last_system_position = system_pos
-                            last_sync_time = time.perf_counter()
-                            local_position_at_sync = system_pos
-                            last_accepted_system_pos = system_pos
-
-                        elif is_user_seek:
+                        if is_auto_refresh or is_user_seek:
                             last_system_position = system_pos
                             last_sync_time = time.perf_counter()
                             local_position_at_sync = system_pos
@@ -202,14 +214,9 @@ async def sync_song(app):
         await asyncio.sleep(0.5)
 
 
-"""PROGRESS CLOCK - Runs at 10ms intervals to keep the progress bar and lyric highlight
-smooth. Reads the shared timeline globals set by sync_song and pushes GUI updates via
-root.after(). Does not call any media APIs directly."""
-
-
 async def progress_clock(app):
     global local_position_at_sync, last_sync_time, is_paused, paused_position, is_initialized
-    global current_lyric_index
+    global lyrics_lines
 
     last_print = -1
     last_lyric_idx = -1
@@ -240,4 +247,4 @@ async def progress_clock(app):
                     last_lyric_idx = new_index
                     app.root.after(0, lambda i=new_index: app.highlight_lyric(i))
 
-        await precise_sleep(0.01)  # 10ms for smooth UI updates
+        await precise_sleep(0.01)
