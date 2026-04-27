@@ -75,7 +75,8 @@ This ensures:
 - **Middle:** Centered scrolling lyrics  
 - **Bottom:**  
   - Progress bar  
-  - Current time / total time  
+  - Current time / total time
+  - Play and pause button
   - Status indicator  
 
 ---
@@ -98,10 +99,6 @@ cd AutoLyricsApp
 - Requires apps that support system media controls
 - Lyrics depend on availability:
   - Some songs may not have synced (LRC) lyrics
-- Sync may require:
-  - waiting a few seconds
-  - or manually pausing/resuming
-  - If the timeline wasn't tracked correctly, kindly drag the timeline or pause and resume to refresh it
 
 ---
  
