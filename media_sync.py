@@ -114,7 +114,7 @@ async def sync_song(app):
 
                     # Auto-nudge: pause then resume to force fresh position
                     await session.try_pause_async()
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.1)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -123,7 +123,7 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     await session.try_play_async()
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.1)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -132,6 +132,13 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     is_initialized = True
+                    
+                    # Immediately sync lyrics to current position after auto-nudge
+                    # so the user sees the correct lyric right away instead of waiting
+                    # for the next line to trigger
+                    if lyrics_lines:
+                        sync_index = get_current_lyric_index(lyrics_lines, system_pos)
+                        app.root.after(0, lambda i=sync_index: app.highlight_lyric(i))
                 else:
                     is_initialized = True
 
@@ -144,13 +151,13 @@ async def sync_song(app):
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
                 
-                # FIX: Handle None return cleanly
+                # Handle None return cleanly
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
                 else:
                     lyrics_lines = []
 
-                # FIX: Pass a COPY of lyrics_lines to avoid race condition
+                # Pass a COPY of lyrics_lines to avoid race condition
                 lyrics_snapshot = lyrics_lines.copy()
                 app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l))
                 app.root.after(0, lambda: app.update_status("Ready"))
@@ -239,10 +246,12 @@ async def progress_clock(app):
                 )
                 last_print = elapsed
 
-            # Advance lyric highlight with +0.3s offset to compensate for sync delay
+            # Advance lyric highlight with +0.3s offset
             if lyrics_lines:
                 lyric_elapsed = max(0, elapsed + 0.3)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
+                
+                # Always update if index changed, including first sync after init
                 if new_index != last_lyric_idx:
                     last_lyric_idx = new_index
                     app.root.after(0, lambda i=new_index: app.highlight_lyric(i))

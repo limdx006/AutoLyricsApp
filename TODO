@@ -1,4 +1,9 @@
-[ ] Translation (Japanese to Roma)
-[ ] Pause and play button
-[ ] Next and previous button
-[ ] Auto sync using pause and play feature
+# Planned
+- [ ] Translation (Japanese to Roma)
+- [ ] Next and previous button
+- [ ] Manual sync timing (remember song that needed manual modification)
+
+
+# Completed
+- [x] Auto sync using pause and play feature
+- [x] Pause and play button
