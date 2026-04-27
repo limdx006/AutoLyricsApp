@@ -41,6 +41,15 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
+# Fetch synced LRC lyrics for a search query
+def get_synced_lyrics(query):
+    try:
+        lrc = syncedlyrics.search(query)
+        return lrc if lrc else "No lyrics found."
+    except Exception as e:
+        return f"Error: {e}"
+
+
 async def _toggle_play_pause_async():
     # Send a play/pause toggle to the current media session
     sessions = await MediaManager.request_async()
@@ -56,15 +65,6 @@ def register_pause_button(app, loop):
         asyncio.run_coroutine_threadsafe(_toggle_play_pause_async(), loop)
 
     app.set_pause_callback(on_click)
-
-
-# Fetch synced LRC lyrics for a search query
-def get_synced_lyrics(query):
-    try:
-        lrc = syncedlyrics.search(query)
-        return lrc if lrc else "No lyrics found."
-    except Exception as e:
-        return f"Error: {e}"
 
 
 """SYNC SONG - Polls the Windows media session every 500ms to detect song changes,
@@ -117,24 +117,33 @@ async def sync_song(app):
                 needs_init_wait = not is_initialized and system_pos > 5.0
 
                 if needs_init_wait:
-                    # Wait until the system position actually moves before trusting it
-                    app.root.after(0, lambda: app.update_status("Waiting for sync..."))
+                    app.root.after(0, lambda: app.update_status("Syncing..."))
                     app.root.after(0, lambda: app.show_hint(True))
 
-                    initial_pos = system_pos
-                    await asyncio.sleep(0.5)
+                    """AUTO NUDGE - Windows only updates the media session timeline position
+                    when playback state changes (play/pause/seek). On app startup the position
+                    can be stale or zero. Sending a quick pause then immediate resume forces
+                    Windows to flush a fresh position value we can trust for syncing."""
+                    await session.try_pause_async()
+                    await asyncio.sleep(0.2)
 
-                    while True:
-                        sessions = await MediaManager.request_async()
-                        session = sessions.get_current_session()
-                        if session:
-                            timeline = session.get_timeline_properties()
-                            new_pos = timeline.position.total_seconds()
-                            if abs(new_pos - initial_pos) > 0.9:
-                                system_pos = new_pos
-                                is_initialized = True
-                                break
-                        await asyncio.sleep(0.5)
+                    sessions = await MediaManager.request_async()
+                    session = sessions.get_current_session()
+                    if session:
+                        timeline = session.get_timeline_properties()
+                        system_pos = timeline.position.total_seconds()
+
+                    await session.try_play_async()
+                    await asyncio.sleep(0.2)
+
+                    sessions = await MediaManager.request_async()
+                    session = sessions.get_current_session()
+                    if session:
+                        timeline = session.get_timeline_properties()
+                        system_pos = timeline.position.total_seconds()
+
+                    is_initialized = True
+                    app.root.after(0, lambda: app.show_hint(False))
                 else:
                     is_initialized = True
                     app.root.after(0, lambda: app.show_hint(False))
