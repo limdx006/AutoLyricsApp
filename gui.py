@@ -123,7 +123,7 @@ class LyricsApp:
         self.pause_btn = tk.Label(
             self.progress_frame,
             text="▌▌",
-            font=("Helvetica", 18),
+            font=("Helvetica", 10),
             bg=BG_COLOR,
             fg="#ffffff",
             cursor="hand2",
@@ -175,7 +175,12 @@ class LyricsApp:
             self._pause_callback()
 
     def set_pause_button_state(self, is_paused):
-        self.pause_btn.config(text="▶" if is_paused else "▌▌", fg="#ffffff")
+        # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
+        if is_paused:
+            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
+        else:
+            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
+
 
     def clear_lyrics(self):
         # Cancel any in-flight label animations
