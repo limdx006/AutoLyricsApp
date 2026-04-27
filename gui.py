@@ -111,7 +111,7 @@ class LyricsApp:
         self.pause_btn = tk.Label(
             self.progress_frame,
             text="▌▌",
-            font=("Helvetica", 18),
+            font=("Helvetica", 10),
             bg=BG_COLOR,
             fg="#ffffff",
             cursor="hand2",
@@ -159,7 +159,11 @@ class LyricsApp:
             self._pause_callback()
 
     def set_pause_button_state(self, is_paused):
-        self.pause_btn.config(text="▶" if is_paused else "▌▌", fg="#ffffff")
+        # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
+        if is_paused:
+            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
+        else:
+            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
 
     def clear_lyrics(self):
         for job_id in self._anim_jobs.values():
@@ -190,6 +194,7 @@ class LyricsApp:
             no_lyrics_label.pack(expand=True, fill=tk.BOTH)
             self.lyrics_frame.update_idletasks()
             self._on_frame_configure()
+            self.lyrics_canvas.yview_moveto(0)
             return
 
         # Top spacer
@@ -215,9 +220,14 @@ class LyricsApp:
         self.lyrics_frame.update_idletasks()
         self._on_frame_configure()
 
-        # Don't auto-scroll to top here. Let the first highlight_lyric() call
-        # from media_sync handle the initial scroll position. This prevents the
-        # race condition where auto-sync highlight happens before this delayed scroll.
+        # Reset scroll to top immediately after layout is complete
+        # Use after_idle to ensure it runs after all pending updates
+        self.lyrics_canvas.after_idle(self._reset_scroll_to_top)
+
+    def _reset_scroll_to_top(self):
+        """Reset canvas scroll to top. Called after lyrics are loaded."""
+        self.lyrics_canvas.yview_moveto(0)
+        self._last_scroll_y = 0
 
     def _rgb_to_hex(self, r, g, b):
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
