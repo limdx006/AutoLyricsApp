@@ -5,6 +5,12 @@ import re
 and finding which lyric line matches the current playback position.
 None of these functions touch global state or the GUI."""
 
+# Pre-computed RGB values for animation (avoids hex↔rgb conversion every frame)
+COLOR_MAP = {
+    "#ffffff": (255, 255, 255),  # active
+    "#aaaaaa": (170, 170, 170),  # nearby
+    "#555555": (85, 85, 85),     # far
+}
 
 # Format seconds as an LRC timestamp string e.g. [02:34.50]
 def format_lrc_time(seconds):
@@ -48,21 +54,3 @@ def get_current_lyric_index(lyrics_lines, position):
         else:
             break
     return index
-
-
-# Print surrounding lyric lines to the console (debug helper)
-def display_lyrics(lyrics_lines, current_index):
-    """Display current lyric and surrounding lines in the terminal."""
-    if not lyrics_lines or current_index < 0:
-        return
-
-    lines_to_show = []
-    for offset in [-1, 0, 1]:
-        idx = current_index + offset
-        if 0 <= idx < len(lyrics_lines):
-            timestamp, text = lyrics_lines[idx]
-            prefix = ">>" if offset == 0 else "  "
-            lines_to_show.append(f"{prefix} [{format_lrc_time(timestamp)}] {text}")
-
-    print("\033[2K\033[1G", end="")  # Clear current terminal line
-    print("\n".join(lines_to_show))
