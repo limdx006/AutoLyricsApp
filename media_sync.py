@@ -137,13 +137,6 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     is_initialized = True
-
-                    # Immediately sync lyrics to current position after auto-nudge
-                    # so the user sees the correct lyric right away instead of waiting
-                    # for the next line to trigger
-                    if lyrics_lines:
-                        sync_index = get_current_lyric_index(lyrics_lines, system_pos)
-                        app.root.after(0, lambda i=sync_index: app.highlight_lyric(i))
                 else:
                     is_initialized = True
 
@@ -162,9 +155,17 @@ async def sync_song(app):
                 else:
                     lyrics_lines = []
 
-                # Pass a COPY of lyrics_lines to avoid race condition
+                # Calculate the correct starting lyric index after nudge sync
+                if needs_init_wait and lyrics_lines:
+                    start_index = get_current_lyric_index(lyrics_lines, system_pos + 0.3)
+                else:
+                    start_index = -1
+
+                # Pass a COPY of lyrics_lines and the starting index to avoid race condition
                 lyrics_snapshot = lyrics_lines.copy()
-                app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l))
+                app.root.after(
+                    0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
+                )
                 app.root.after(0, lambda: app.update_status("Ready"))
 
             else:

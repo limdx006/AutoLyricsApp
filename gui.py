@@ -177,7 +177,7 @@ class LyricsApp:
         self._last_scroll_y = -1
         # Don't reset scroll here — let load_lyrics() or highlight_lyric() handle it
 
-    def load_lyrics(self, lyrics_data):
+    def load_lyrics(self, lyrics_data, initial_index=-1):
         self.clear_lyrics()
 
         if not lyrics_data:
@@ -220,14 +220,47 @@ class LyricsApp:
         self.lyrics_frame.update_idletasks()
         self._on_frame_configure()
 
-        # Reset scroll to top immediately after layout is complete
-        # Use after_idle to ensure it runs after all pending updates
-        self.lyrics_canvas.after_idle(self._reset_scroll_to_top)
+        # After layout is committed, jump to the correct position
+        self.lyrics_canvas.after_idle(
+            lambda: self._apply_initial_position(initial_index)
+        )
 
-    def _reset_scroll_to_top(self):
-        """Reset canvas scroll to top. Called after lyrics are loaded."""
-        self.lyrics_canvas.yview_moveto(0)
-        self._last_scroll_y = 0
+    def _apply_initial_position(self, initial_index):
+        """After lyrics load, jump to the correct position without animation.
+        If initial_index is valid (mid-song resume), scroll to that lyric instantly
+        and style it as active so the user sees the right line immediately.
+        If initial_index is -1 (new song from the start), just reset to top."""
+        if initial_index > 0 and initial_index < len(self.lyric_labels):
+            # Style the active line and its neighbours directly, no animation
+            for i in range(len(self.lyric_labels)):
+                _, label = self.lyric_labels[i]
+                if i == initial_index:
+                    label.config(fg="#ffffff", font=("Helvetica", 15, "bold"))
+                elif i == initial_index - 1 or i == initial_index + 1:
+                    label.config(fg="#aaaaaa", font=("Helvetica", 13))
+                else:
+                    label.config(fg="#555555", font=("Helvetica", 12))
+
+            self._last_highlight_index = initial_index
+
+            # Scroll directly to the active lyric
+            _, label = self.lyric_labels[initial_index]
+            canvas_height = self.lyrics_canvas.winfo_height()
+            label_y = label.winfo_y()
+            label_height = label.winfo_height()
+
+            scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
+            max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
+            scroll_pos = max(0, min(scroll_pos, max_scroll))
+
+            frame_height = self.lyrics_frame.winfo_height()
+            scroll_ratio = scroll_pos / frame_height if frame_height > 0 else 0
+            self._last_scroll_y = scroll_ratio
+            self.lyrics_canvas.yview_moveto(scroll_ratio)
+        else:
+            # New song starting from the beginning — reset to top
+            self.lyrics_canvas.yview_moveto(0)
+            self._last_scroll_y = 0
 
     def _rgb_to_hex(self, r, g, b):
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
