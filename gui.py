@@ -4,11 +4,6 @@ from config import WINDOW_WIDTH, WINDOW_HEIGHT, BG_COLOR, ACCENT_COLOR
 from lyrics_utils import format_display_time, COLOR_MAP
 
 
-"""GUI - Tkinter window that displays the current song, a progress bar, and synced lyrics.
-All updates are driven by the async layer via root.after() calls — this class never
-reads media state directly."""
-
-
 class LyricsApp:
     def __init__(self, root):
         self.root = root
@@ -17,26 +12,19 @@ class LyricsApp:
         self._build_lyrics_panel()
         self._build_progress_bar()
 
-        # Internal state
         self.lyric_labels = []
         self._last_highlight_index = -1
-        self._anim_jobs = {}  # label index -> pending after() id
-        self._last_scroll_y = (
-            -1
-        )  # Track last scroll position to avoid redundant scrolls
+        self._anim_jobs = {}
+        self._last_scroll_y = -1
 
-        # Pre-computed animation constants (avoid hex↔rgb conversion every frame)
         self._colors = {
             "active": COLOR_MAP["#ffffff"],
             "nearby": COLOR_MAP["#aaaaaa"],
             "far": COLOR_MAP["#555555"],
         }
 
-        # Keep lyrics_frame width in sync with canvas width
         self.lyrics_frame.bind("<Configure>", self._on_frame_configure)
         self.lyrics_canvas.bind("<Configure>", self._on_canvas_configure)
-
-    # setup
 
     def _build_window(self):
         self.root.title("Lyrics Player")
@@ -142,15 +130,11 @@ class LyricsApp:
             0, 0, 0, 6, fill="#e94560", outline=""
         )
 
-    # canvas helpers
-
     def _on_frame_configure(self, event=None):
         self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
 
     def _on_canvas_configure(self, event):
         self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
-
-    # public update API
 
     def update_song_info(self, title, artist, duration):
         self.title_label.config(text=title or "Unknown Title")
@@ -181,9 +165,7 @@ class LyricsApp:
         else:
             self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
 
-
     def clear_lyrics(self):
-        # Cancel any in-flight label animations
         for job_id in self._anim_jobs.values():
             self.root.after_cancel(job_id)
         self._anim_jobs.clear()
@@ -193,12 +175,11 @@ class LyricsApp:
         self.lyric_labels = []
         self._last_highlight_index = -1
         self._last_scroll_y = -1
-        self.lyrics_canvas.yview_moveto(0)
+        # Don't reset scroll here — let load_lyrics() or highlight_lyric() handle it
 
-    def load_lyrics(self, lyrics_data):
+    def load_lyrics(self, lyrics_data, initial_index=-1):
         self.clear_lyrics()
 
-        # Show "no lyrics" message if empty
         if not lyrics_data:
             no_lyrics_label = tk.Label(
                 self.lyrics_frame,
@@ -213,9 +194,10 @@ class LyricsApp:
             no_lyrics_label.pack(expand=True, fill=tk.BOTH)
             self.lyrics_frame.update_idletasks()
             self._on_frame_configure()
+            self.lyrics_canvas.yview_moveto(0)
             return
 
-        # Top spacer keeps the first lyric centred on screen
+        # Top spacer
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
 
         for timestamp, text in lyrics_data:
@@ -232,16 +214,53 @@ class LyricsApp:
             label.pack(fill=tk.X)
             self.lyric_labels.append((timestamp, label))
 
-        # Bottom spacer keeps the last lyric centred on screen
+        # Bottom spacer
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
 
         self.lyrics_frame.update_idletasks()
         self._on_frame_configure()
 
-        # Small delay ensures the canvas scroll region is fully committed
-        self.lyrics_canvas.after(50, lambda: self.lyrics_canvas.yview_moveto(0))
+        # After layout is committed, jump to the correct position
+        self.lyrics_canvas.after_idle(
+            lambda: self._apply_initial_position(initial_index)
+        )
 
-    # animation helpers - OPTIMIZED
+    def _apply_initial_position(self, initial_index):
+        """After lyrics load, jump to the correct position without animation.
+        If initial_index is valid (mid-song resume), scroll to that lyric instantly
+        and style it as active so the user sees the right line immediately.
+        If initial_index is -1 (new song from the start), just reset to top."""
+        if initial_index > 0 and initial_index < len(self.lyric_labels):
+            # Style the active line and its neighbours directly, no animation
+            for i in range(len(self.lyric_labels)):
+                _, label = self.lyric_labels[i]
+                if i == initial_index:
+                    label.config(fg="#ffffff", font=("Helvetica", 15, "bold"))
+                elif i == initial_index - 1 or i == initial_index + 1:
+                    label.config(fg="#aaaaaa", font=("Helvetica", 13))
+                else:
+                    label.config(fg="#555555", font=("Helvetica", 12))
+
+            self._last_highlight_index = initial_index
+
+            # Scroll directly to the active lyric
+            _, label = self.lyric_labels[initial_index]
+            canvas_height = self.lyrics_canvas.winfo_height()
+            label_y = label.winfo_y()
+            label_height = label.winfo_height()
+
+            scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
+            max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
+            scroll_pos = max(0, min(scroll_pos, max_scroll))
+
+            frame_height = self.lyrics_frame.winfo_height()
+            scroll_ratio = scroll_pos / frame_height if frame_height > 0 else 0
+            self._last_scroll_y = scroll_ratio
+            self.lyrics_canvas.yview_moveto(scroll_ratio)
+        else:
+            # New song starting from the beginning — reset to top
+            self.lyrics_canvas.yview_moveto(0)
+            self._last_scroll_y = 0
 
     def _rgb_to_hex(self, r, g, b):
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
@@ -257,12 +276,11 @@ class LyricsApp:
         step,
         total_steps,
     ):
-        """Advance one frame of a label's color+size transition."""
         if label_idx >= len(self.lyric_labels):
             return
 
         t = step / total_steps
-        t_eased = 1 - (1 - t) ** 2  # Ease-out
+        t_eased = 1 - (1 - t) ** 2
 
         sr, sg, sb = start_rgb
         er, eg, eb = end_rgb
@@ -278,8 +296,7 @@ class LyricsApp:
         label.config(fg=color, font=font_spec)
 
         if step < total_steps:
-            # OPTIMIZATION: Store callback reference to avoid lambda creation overhead
-            # Use a bound method with args stored in closure
+
             def next_frame(
                 idx=label_idx,
                 sr=start_rgb,
@@ -299,13 +316,11 @@ class LyricsApp:
             self._anim_jobs[label_idx] = job
 
     def _start_transition(self, label_idx, end_color_name, end_size, bold):
-        """Read current state and kick off animation using pre-computed RGB values."""
         if label_idx >= len(self.lyric_labels):
             return
 
         _, label = self.lyric_labels[label_idx]
 
-        # OPTIMIZATION: Parse font once, store base size
         current_font = label.cget("font")
         if isinstance(current_font, tuple):
             start_size = current_font[1]
@@ -314,7 +329,6 @@ class LyricsApp:
             start_size = int(parts[1]) if len(parts) > 1 else end_size
 
         current_color = label.cget("fg")
-        # Map current color to RGB (fallback to far color if unknown)
         start_rgb = COLOR_MAP.get(current_color, COLOR_MAP["#555555"])
         end_rgb = self._colors[end_color_name]
 
@@ -327,6 +341,9 @@ class LyricsApp:
         )
 
     def highlight_lyric(self, index):
+        if not self.lyric_labels:
+            return
+
         prev = self._last_highlight_index
 
         if index == prev:
@@ -347,7 +364,7 @@ class LyricsApp:
             else:
                 self._start_transition(i, "far", 12, False)
 
-        # Scroll so the active lyric is vertically centred
+        # Scroll to center the active lyric
         _, label = self.lyric_labels[index]
         canvas_height = self.lyrics_canvas.winfo_height()
         label_y = label.winfo_y()
@@ -357,12 +374,11 @@ class LyricsApp:
         max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
         scroll_pos = max(0, min(scroll_pos, max_scroll))
 
-        # OPTIMIZATION: Skip scroll if position hasn't changed meaningfully
         scroll_ratio = (
             scroll_pos / self.lyrics_frame.winfo_height()
             if self.lyrics_frame.winfo_height() > 0
             else 0
         )
-        if abs(scroll_ratio - self._last_scroll_y) > 0.01:  # Only scroll if >1% change
+        if abs(scroll_ratio - self._last_scroll_y) > 0.01:
             self._last_scroll_y = scroll_ratio
             self.lyrics_canvas.yview_moveto(scroll_ratio)

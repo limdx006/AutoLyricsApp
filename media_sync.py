@@ -43,7 +43,9 @@ async def precise_sleep(sleep_for: float) -> None:
 def get_synced_lyrics(query):
     try:
         lrc = syncedlyrics.search(query)
-        return lrc if lrc else None  # Return None instead of string for cleaner handling
+        return (
+            lrc if lrc else None
+        )  # Return None instead of string for cleaner handling
     except Exception:
         return None
 
@@ -57,6 +59,7 @@ async def _toggle_play_pause_async():
 
 def register_pause_button(app, loop):
     """Wire the GUI pause button to the async toggle."""
+
     def on_click():
         asyncio.run_coroutine_threadsafe(_toggle_play_pause_async(), loop)
 
@@ -67,6 +70,8 @@ def register_pause_button(app, loop):
 pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
 The timeline correction logic below must not be modified — it handles the irregular
 update cadence of the Windows media session API."""
+
+
 async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
@@ -114,7 +119,7 @@ async def sync_song(app):
 
                     # Auto-nudge: pause then resume to force fresh position
                     await session.try_pause_async()
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.1)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -123,7 +128,7 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     await session.try_play_async()
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.1)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -143,16 +148,24 @@ async def sync_song(app):
                 # Fetch and parse lyrics, then hand them to the GUI
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
-                
-                # FIX: Handle None return cleanly
+
+                # Handle None return cleanly
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
                 else:
                     lyrics_lines = []
 
-                # FIX: Pass a COPY of lyrics_lines to avoid race condition
+                # Calculate the correct starting lyric index after nudge sync
+                if needs_init_wait and lyrics_lines:
+                    start_index = get_current_lyric_index(lyrics_lines, system_pos + 0.3)
+                else:
+                    start_index = -1
+
+                # Pass a COPY of lyrics_lines and the starting index to avoid race condition
                 lyrics_snapshot = lyrics_lines.copy()
-                app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l))
+                app.root.after(
+                    0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
+                )
                 app.root.after(0, lambda: app.update_status("Ready"))
 
             else:
@@ -239,10 +252,12 @@ async def progress_clock(app):
                 )
                 last_print = elapsed
 
-            # Advance lyric highlight with +0.3s offset to compensate for sync delay
+            # Advance lyric highlight with +0.3s offset
             if lyrics_lines:
                 lyric_elapsed = max(0, elapsed + 0.3)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
+
+                # Always update if index changed, including first sync after init
                 if new_index != last_lyric_idx:
                     last_lyric_idx = new_index
                     app.root.after(0, lambda i=new_index: app.highlight_lyric(i))

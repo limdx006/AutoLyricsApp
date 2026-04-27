@@ -9,8 +9,9 @@ None of these functions touch global state or the GUI."""
 COLOR_MAP = {
     "#ffffff": (255, 255, 255),  # active
     "#aaaaaa": (170, 170, 170),  # nearby
-    "#555555": (85, 85, 85),     # far
+    "#555555": (85, 85, 85),  # far
 }
+
 
 # Format seconds as an LRC timestamp string e.g. [02:34.50]
 def format_lrc_time(seconds):
