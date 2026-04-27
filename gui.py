@@ -135,7 +135,7 @@ class LyricsApp:
         )
         self.status_label.pack(side=tk.BOTTOM, pady=10)
 
-        # Time labels flank the progress bar
+        # Row that holds: current time | pause button | total time
         self.progress_frame = tk.Frame(self.main_frame, bg=BG_COLOR, height=40)
         self.progress_frame.pack(fill=tk.X, padx=20, pady=5, side=tk.BOTTOM)
         self.progress_frame.pack_propagate(False)
@@ -157,6 +157,20 @@ class LyricsApp:
             fg="#ffffff",
         )
         self.total_time_label.pack(side=tk.RIGHT)
+
+        # Pause button centered between the two time labels (Label used to avoid OS button chrome)
+        self.pause_btn = tk.Label(
+            self.progress_frame,
+            text="▌▌",
+            font=("Helvetica", 10),
+            bg=BG_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.pause_btn.pack(expand=True)
+        self.pause_btn.bind("<Button-1>", lambda e: self._on_pause_btn_clicked())
+        self.pause_btn.bind("<Enter>", lambda e: self.pause_btn.config(fg="#e94560"))
+        self.pause_btn.bind("<Leave>", lambda e: self.pause_btn.config(fg="#ffffff"))
 
         # Thin coloured bar drawn on a canvas for custom styling
         self.progress_canvas = tk.Canvas(
@@ -192,6 +206,22 @@ class LyricsApp:
 
     def update_status(self, text):
         self.status_label.config(text=text)
+
+    def set_pause_callback(self, callback):
+        # Registered once by media_sync so the button can trigger a winsdk call
+        self._pause_callback = callback
+
+    def _on_pause_btn_clicked(self):
+        # Forward the click to the async layer if a callback has been registered
+        if hasattr(self, "_pause_callback") and self._pause_callback:
+            self._pause_callback()
+
+    def set_pause_button_state(self, is_paused):
+        # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
+        if is_paused:
+            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
+        else:
+            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
 
     def show_hint(self, show=True):
         """Show or hide the center hint message.

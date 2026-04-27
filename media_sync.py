@@ -41,6 +41,23 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
+async def _toggle_play_pause_async():
+    # Send a play/pause toggle to the current media session
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        await session.try_toggle_play_pause_async()
+
+
+def register_pause_button(app, loop):
+    """Wire the GUI pause button to the async toggle so clicking it controls the media session.
+    Called once from main.py after the event loop is created but before the thread starts."""
+    def on_click():
+        asyncio.run_coroutine_threadsafe(_toggle_play_pause_async(), loop)
+
+    app.set_pause_callback(on_click)
+
+
 # Fetch synced LRC lyrics for a search query
 def get_synced_lyrics(query):
     try:
@@ -143,6 +160,7 @@ async def sync_song(app):
                         time.perf_counter() - last_sync_time
                     )
                     app.root.after(0, lambda: app.update_status("Paused"))
+                    app.root.after(0, lambda: app.set_pause_button_state(True))
 
                 elif currently_playing and is_paused:
                     is_paused = False
@@ -151,6 +169,7 @@ async def sync_song(app):
                     local_position_at_sync = system_pos
                     last_accepted_system_pos = system_pos
                     app.root.after(0, lambda: app.update_status("Playing"))
+                    app.root.after(0, lambda: app.set_pause_button_state(False))
                     continue
 
                 # timeline correction (do not modify)
