@@ -222,7 +222,17 @@ class LyricsApp:
     def _rgb_to_hex(self, r, g, b):
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
 
-    def _animate_label(self, label_idx, start_rgb, end_rgb, start_size, end_size, bold, step, total_steps):
+    def _animate_label(
+        self,
+        label_idx,
+        start_rgb,
+        end_rgb,
+        start_size,
+        end_size,
+        bold,
+        step,
+        total_steps,
+    ):
         if label_idx >= len(self.lyric_labels):
             return
 
@@ -243,8 +253,17 @@ class LyricsApp:
         label.config(fg=color, font=font_spec)
 
         if step < total_steps:
-            def next_frame(idx=label_idx, sr=start_rgb, er=end_rgb, ss=start_size, es=end_size,
-                          b=bold, s=step+1, ts=total_steps):
+
+            def next_frame(
+                idx=label_idx,
+                sr=start_rgb,
+                er=end_rgb,
+                ss=start_size,
+                es=end_size,
+                b=bold,
+                s=step + 1,
+                ts=total_steps,
+            ):
                 self._animate_label(idx, sr, er, ss, es, b, s, ts)
 
             job = self.root.after(15, next_frame)
@@ -274,7 +293,9 @@ class LyricsApp:
             self.root.after_cancel(self._anim_jobs[label_idx])
             del self._anim_jobs[label_idx]
 
-        self._animate_label(label_idx, start_rgb, end_rgb, start_size, end_size, bold, 1, 10)
+        self._animate_label(
+            label_idx, start_rgb, end_rgb, start_size, end_size, bold, 1, 10
+        )
 
     def highlight_lyric(self, index):
         if not self.lyric_labels:
@@ -310,7 +331,11 @@ class LyricsApp:
         max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
         scroll_pos = max(0, min(scroll_pos, max_scroll))
 
-        scroll_ratio = scroll_pos / self.lyrics_frame.winfo_height() if self.lyrics_frame.winfo_height() > 0 else 0
+        scroll_ratio = (
+            scroll_pos / self.lyrics_frame.winfo_height()
+            if self.lyrics_frame.winfo_height() > 0
+            else 0
+        )
         if abs(scroll_ratio - self._last_scroll_y) > 0.01:
             self._last_scroll_y = scroll_ratio
             self.lyrics_canvas.yview_moveto(scroll_ratio)

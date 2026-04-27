@@ -43,7 +43,9 @@ async def precise_sleep(sleep_for: float) -> None:
 def get_synced_lyrics(query):
     try:
         lrc = syncedlyrics.search(query)
-        return lrc if lrc else None  # Return None instead of string for cleaner handling
+        return (
+            lrc if lrc else None
+        )  # Return None instead of string for cleaner handling
     except Exception:
         return None
 
@@ -57,6 +59,7 @@ async def _toggle_play_pause_async():
 
 def register_pause_button(app, loop):
     """Wire the GUI pause button to the async toggle."""
+
     def on_click():
         asyncio.run_coroutine_threadsafe(_toggle_play_pause_async(), loop)
 
@@ -67,6 +70,8 @@ def register_pause_button(app, loop):
 pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
 The timeline correction logic below must not be modified — it handles the irregular
 update cadence of the Windows media session API."""
+
+
 async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
@@ -132,7 +137,7 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     is_initialized = True
-                    
+
                     # Immediately sync lyrics to current position after auto-nudge
                     # so the user sees the correct lyric right away instead of waiting
                     # for the next line to trigger
@@ -150,7 +155,7 @@ async def sync_song(app):
                 # Fetch and parse lyrics, then hand them to the GUI
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
-                
+
                 # Handle None return cleanly
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
@@ -250,7 +255,7 @@ async def progress_clock(app):
             if lyrics_lines:
                 lyric_elapsed = max(0, elapsed + 0.3)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
-                
+
                 # Always update if index changed, including first sync after init
                 if new_index != last_lyric_idx:
                     last_lyric_idx = new_index
