@@ -210,7 +210,7 @@ class LyricsApp:
     def set_pause_button_state(self, is_paused):
         # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
         if is_paused:
-            self.pause_btn.config(text="▶", font=("Helvetica", 20), fg="#ffffff")
+            self.pause_btn.config(text="▶", font=("Helvetica", 30), fg="#ffffff")
         else:
             self.pause_btn.config(text="▌▌", font=("Helvetica", 14), fg="#ffffff")
 
