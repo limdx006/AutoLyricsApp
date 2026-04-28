@@ -16,6 +16,7 @@ class LyricsApp:
         self._last_highlight_index = -1
         self._anim_jobs = {}
         self._last_scroll_y = -1
+        self._scroll_job = None  # Pending after() id for the scroll animation
 
         self._colors = {
             "active": COLOR_MAP["#ffffff"],
@@ -218,12 +219,15 @@ class LyricsApp:
             self.root.after_cancel(job_id)
         self._anim_jobs.clear()
 
+        if self._scroll_job is not None:
+            self.root.after_cancel(self._scroll_job)
+            self._scroll_job = None
+
         for widget in self.lyrics_frame.winfo_children():
             widget.destroy()
         self.lyric_labels = []
         self._last_highlight_index = -1
         self._last_scroll_y = -1
-        # Don't reset scroll here — let load_lyrics() or highlight_lyric() handle it
 
     def load_lyrics(self, lyrics_data, initial_index=-1):
         self.clear_lyrics()
@@ -313,6 +317,40 @@ class LyricsApp:
     def _rgb_to_hex(self, r, g, b):
         return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
 
+    def _animate_scroll(self, start_ratio, end_ratio, step, total_steps):
+        """Smoothly interpolate the canvas scroll position from start_ratio to end_ratio."""
+        t = step / total_steps
+        # Ease-in-out: slow start, fast middle, slow finish
+        t_eased = t * t * (3 - 2 * t)
+
+        current_ratio = start_ratio + (end_ratio - start_ratio) * t_eased
+        self.lyrics_canvas.yview_moveto(current_ratio)
+
+        if step < total_steps:
+            self._scroll_job = self.root.after(
+                12,
+                lambda: self._animate_scroll(start_ratio, end_ratio, step + 1, total_steps),
+            )
+        else:
+            self._last_scroll_y = end_ratio
+            self._scroll_job = None
+
+    def _start_scroll(self, target_ratio):
+        """Cancel any in-flight scroll animation and start a new one to target_ratio."""
+        if abs(target_ratio - self._last_scroll_y) <= 0.005:
+            return
+
+        # Cancel previous scroll animation if one is running
+        if self._scroll_job is not None:
+            self.root.after_cancel(self._scroll_job)
+            self._scroll_job = None
+
+        start_ratio = self._last_scroll_y if self._last_scroll_y >= 0 else target_ratio
+        self._last_scroll_y = target_ratio
+
+        # 20 steps × 12ms ≈ 240ms smooth scroll
+        self._animate_scroll(start_ratio, target_ratio, step=1, total_steps=20)
+
     def _animate_label(
         self,
         label_idx,
@@ -328,7 +366,7 @@ class LyricsApp:
             return
 
         t = step / total_steps
-        t_eased = 1 - (1 - t) ** 2
+        t_eased = 1 - (1 - t) ** 2  # Ease-out
 
         sr, sg, sb = start_rgb
         er, eg, eb = end_rgb
@@ -357,11 +395,11 @@ class LyricsApp:
             ):
                 self._animate_label(idx, sr, er, ss, es, b, s, ts)
 
-            job = self.root.after(15, next_frame)
-
+            # Cancel previous frame before scheduling next to avoid double-running
             if label_idx in self._anim_jobs:
                 self.root.after_cancel(self._anim_jobs[label_idx])
-            self._anim_jobs[label_idx] = job
+
+            self._anim_jobs[label_idx] = self.root.after(15, next_frame)
 
     def _start_transition(self, label_idx, end_color_name, end_size, bold):
         if label_idx >= len(self.lyric_labels):
@@ -384,8 +422,9 @@ class LyricsApp:
             self.root.after_cancel(self._anim_jobs[label_idx])
             del self._anim_jobs[label_idx]
 
+        # 16 steps × 15ms ≈ 240ms label transition
         self._animate_label(
-            label_idx, start_rgb, end_rgb, start_size, end_size, bold, 1, 10
+            label_idx, start_rgb, end_rgb, start_size, end_size, bold, 1, 16
         )
 
     def highlight_lyric(self, index):
@@ -412,7 +451,7 @@ class LyricsApp:
             else:
                 self._start_transition(i, "far", 12, False)
 
-        # Scroll to center the active lyric
+        # Calculate target scroll ratio and animate smoothly to it
         _, label = self.lyric_labels[index]
         canvas_height = self.lyrics_canvas.winfo_height()
         label_y = label.winfo_y()
@@ -422,11 +461,7 @@ class LyricsApp:
         max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
         scroll_pos = max(0, min(scroll_pos, max_scroll))
 
-        scroll_ratio = (
-            scroll_pos / self.lyrics_frame.winfo_height()
-            if self.lyrics_frame.winfo_height() > 0
-            else 0
-        )
-        if abs(scroll_ratio - self._last_scroll_y) > 0.01:
-            self._last_scroll_y = scroll_ratio
-            self.lyrics_canvas.yview_moveto(scroll_ratio)
+        frame_height = self.lyrics_frame.winfo_height()
+        scroll_ratio = scroll_pos / frame_height if frame_height > 0 else 0
+
+        self._start_scroll(scroll_ratio)
