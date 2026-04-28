@@ -39,6 +39,31 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
+async def auto_nudge(session, sleep_delay: float = 0.02):
+    """Force a pause/resume cycle to refresh the current media position."""
+    await session.try_pause_async()
+    await precise_sleep(sleep_delay)
+
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        timeline = session.get_timeline_properties()
+        system_pos = timeline.position.total_seconds()
+    else:
+        return None
+
+    await session.try_play_async()
+    await precise_sleep(sleep_delay)
+
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        timeline = session.get_timeline_properties()
+        return timeline.position.total_seconds()
+
+    return system_pos
+
+
 # Fetch synced LRC lyrics for a search query
 def get_synced_lyrics(query):
     try:
@@ -141,34 +166,15 @@ async def sync_song(app):
                 app.root.after(0, app.clear_lyrics)
                 app.root.after(0, lambda: app.update_status("Loading lyrics..."))
 
-                needs_init_wait = not is_initialized and system_pos > 5.0
+                should_initialise = not is_initialized
 
-                if needs_init_wait:
+                if should_initialise:
                     app.root.after(0, lambda: app.update_status("Syncing..."))
+                    new_system_pos = await auto_nudge(session, sleep_delay=0.02)
+                    if new_system_pos is not None:
+                        system_pos = new_system_pos
 
-                    # Auto-nudge: pause then resume to force fresh position
-                    await session.try_pause_async()
-                    await asyncio.sleep(0.02)
-
-                    sessions = await MediaManager.request_async()
-                    session = sessions.get_current_session()
-                    if session:
-                        timeline = session.get_timeline_properties()
-                        system_pos = timeline.position.total_seconds()
-
-                    await session.try_play_async()
-                    await asyncio.sleep(0.02)
-
-                    sessions = await MediaManager.request_async()
-                    session = sessions.get_current_session()
-                    if session:
-                        timeline = session.get_timeline_properties()
-                        system_pos = timeline.position.total_seconds()
-
-                    is_initialized = True
-                else:
-                    is_initialized = True
-
+                is_initialized = True
                 last_system_position = system_pos
                 last_sync_time = time.perf_counter()
                 local_position_at_sync = system_pos
@@ -185,7 +191,7 @@ async def sync_song(app):
                     lyrics_lines = []
 
                 # Calculate the correct starting lyric index after nudge sync
-                if needs_init_wait and lyrics_lines:
+                if should_initialise and lyrics_lines:
                     start_index = get_current_lyric_index(
                         lyrics_lines, system_pos + 0.3
                     )
@@ -283,9 +289,9 @@ async def progress_clock(app):
                 )
                 last_print = elapsed
 
-            # Advance lyric highlight with +0.3s offset
+            # Advance lyric highlight with +0.4s offset
             if lyrics_lines:
-                lyric_elapsed = max(0, elapsed + 0.3)
+                lyric_elapsed = max(0, elapsed + 0.4)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
 
                 # Always update if index changed, including first sync after init
