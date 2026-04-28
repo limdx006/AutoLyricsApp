@@ -13,5 +13,5 @@ PyInstaller.__main__.run([
     '--hidden-import', 'winsdk',        # Ensure winsdk is bundled
     '--hidden-import', 'syncedlyrics',
     '--hidden-import', 'tkinter',
-    # '--icon', 'icon.ico',
+    '--icon', 'icon.ico',
 ])
