@@ -3,7 +3,7 @@ import threading
 import tkinter as tk
 
 from gui import LyricsApp
-from media_sync import sync_song, progress_clock, register_pause_button
+from media_sync import sync_song, progress_clock, register_pause_button, register_next_prev_buttons
 
 
 """MAIN - Entry point. Creates the Tkinter window, starts the async media sync
@@ -16,8 +16,9 @@ def main():
 
     loop = asyncio.new_event_loop()
 
-    # Wire the pause button to the async loop before the thread starts
+    # Wire the pause, next, and previous buttons to the async loop before the thread starts
     register_pause_button(app, loop)
+    register_next_prev_buttons(app, loop)
 
     def run_async():
         asyncio.set_event_loop(loop)

@@ -108,18 +108,48 @@ class LyricsApp:
         )
         self.total_time_label.pack(side=tk.RIGHT)
 
-        self.pause_btn = tk.Label(
-            self.progress_frame,
-            text="▌▌",
-            font=("Helvetica", 10),
+        # Inner frame holds the three transport buttons, centered between the time labels
+        controls_frame = tk.Frame(self.progress_frame, bg=BG_COLOR)
+        controls_frame.pack(expand=True)
+
+        self.prev_btn = tk.Label(
+            controls_frame,
+            text="◀◀",
+            font=("Helvetica", 20),
             bg=BG_COLOR,
             fg="#ffffff",
             cursor="hand2",
         )
-        self.pause_btn.pack(expand=True)
+        self.prev_btn.pack(side=tk.LEFT, padx=10)
+        self.prev_btn.bind("<Button-1>", lambda e: self._on_prev_btn_clicked())
+        self.prev_btn.bind("<Enter>", lambda e: self.prev_btn.config(fg="#e94560"))
+        self.prev_btn.bind("<Leave>", lambda e: self.prev_btn.config(fg="#ffffff"))
+
+        self.pause_btn = tk.Label(
+            controls_frame,
+            text="▌▌",
+            font=("Helvetica", 14),
+            bg=BG_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.pause_btn.pack(side=tk.LEFT, padx=10)
         self.pause_btn.bind("<Button-1>", lambda e: self._on_pause_btn_clicked())
         self.pause_btn.bind("<Enter>", lambda e: self.pause_btn.config(fg="#e94560"))
         self.pause_btn.bind("<Leave>", lambda e: self.pause_btn.config(fg="#ffffff"))
+
+        self.next_btn = tk.Label(
+            controls_frame,
+            text="▶▶",
+            font=("Helvetica", 20),
+            bg=BG_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.next_btn.pack(side=tk.LEFT, padx=10)
+        self.next_btn.bind("<Button-1>", lambda e: self._on_next_btn_clicked())
+        self.next_btn.bind("<Enter>", lambda e: self.next_btn.config(fg="#e94560"))
+        self.next_btn.bind("<Leave>", lambda e: self.next_btn.config(fg="#ffffff"))
 
         self.progress_canvas = tk.Canvas(
             self.main_frame, bg=BG_COLOR, height=6, highlightthickness=0
@@ -158,12 +188,26 @@ class LyricsApp:
         if hasattr(self, "_pause_callback") and self._pause_callback:
             self._pause_callback()
 
+    def set_next_callback(self, callback):
+        self._next_callback = callback
+
+    def set_prev_callback(self, callback):
+        self._prev_callback = callback
+
+    def _on_next_btn_clicked(self):
+        if hasattr(self, "_next_callback") and self._next_callback:
+            self._next_callback()
+
+    def _on_prev_btn_clicked(self):
+        if hasattr(self, "_prev_callback") and self._prev_callback:
+            self._prev_callback()
+
     def set_pause_button_state(self, is_paused):
         # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
         if is_paused:
-            self.pause_btn.config(text="▶", font=("Helvetica", 25), fg="#ffffff")
+            self.pause_btn.config(text="▶", font=("Helvetica", 20), fg="#ffffff")
         else:
-            self.pause_btn.config(text="▌▌", font=("Helvetica", 10), fg="#ffffff")
+            self.pause_btn.config(text="▌▌", font=("Helvetica", 14), fg="#ffffff")
 
     def clear_lyrics(self):
         for job_id in self._anim_jobs.values():
