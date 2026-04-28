@@ -46,9 +46,12 @@ class LyricsApp:
 
         self.settings_menu = tk.Menu(self.root, tearoff=0)
         self.settings_menu.add_command(
-            label="Lyric highlight offset",
-            command=self._open_lyric_offset_settings,
+            label="No settings available",
+            state="disabled",
         )
+
+        self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
+        self._offset_var.trace_add("write", self._on_offset_var_changed)
 
         self.title_label = tk.Label(
             self.info_frame,
@@ -87,6 +90,40 @@ class LyricsApp:
         self.refresh_btn.bind("<Button-1>", lambda e: self._on_refresh_btn_clicked())
         self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
         self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
+
+        offset_frame = tk.Frame(button_row, bg=ACCENT_COLOR)
+        offset_frame.pack(side=tk.LEFT, expand=True)
+
+        tk.Label(
+            offset_frame,
+            text="Offset:",
+            font=("Helvetica", 14, "bold"),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+        ).pack(side=tk.LEFT, padx=(0, 6))
+
+        tk.Button(
+            offset_frame,
+            text="-",
+            width=2,
+            command=self._decrement_lyric_offset,
+        ).pack(side=tk.LEFT)
+
+        self.offset_entry = tk.Entry(
+            offset_frame,
+            textvariable=self._offset_var,
+            width=4,
+            justify=tk.CENTER,
+            font=("Helvetica", 11),
+        )
+        self.offset_entry.pack(side=tk.LEFT, padx=4)
+
+        tk.Button(
+            offset_frame,
+            text="+",
+            width=2,
+            command=self._increment_lyric_offset,
+        ).pack(side=tk.LEFT)
 
         self.settings_btn = tk.Label(
             button_row,
@@ -258,70 +295,23 @@ class LyricsApp:
             self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height(),
         )
 
-    def _open_lyric_offset_settings(self):
-        if hasattr(self, "_settings_window") and self._settings_window.winfo_exists():
-            self._settings_window.lift()
+    def _on_offset_var_changed(self, *args):
+        if getattr(self, "_offset_update_lock", False):
             return
 
-        self._settings_window = tk.Toplevel(self.root)
-        self._settings_window.title("Settings")
-        self._settings_window.geometry("280x140")
-        self._settings_window.configure(bg=BG_COLOR)
-        self._settings_window.resizable(False, False)
-        self._settings_window.transient(self.root)
+        try:
+            value = float(self._offset_var.get())
+        except ValueError:
+            return
 
-        tk.Label(
-            self._settings_window,
-            text="Lyric highlight offset",
-            font=("Helvetica", 12, "bold"),
-            bg=BG_COLOR,
-            fg="#ffffff",
-        ).pack(pady=(14, 6))
+        value = round(value, 1)
+        if value == self.lyric_offset:
+            return
 
-        self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
-
-        control_frame = tk.Frame(self._settings_window, bg=BG_COLOR)
-        control_frame.pack(pady=6)
-
-        tk.Button(
-            control_frame,
-            text="-",
-            width=3,
-            command=self._decrement_lyric_offset,
-        ).pack(side=tk.LEFT, padx=(0, 4))
-
-        self._offset_entry = tk.Entry(
-            control_frame,
-            textvariable=self._offset_var,
-            width=6,
-            justify=tk.CENTER,
-            font=("Helvetica", 12),
-        )
-        self._offset_entry.pack(side=tk.LEFT)
-        self._offset_entry.bind("<Return>", lambda e: self._apply_lyric_offset_from_entry())
-
-        tk.Button(
-            control_frame,
-            text="+",
-            width=3,
-            command=self._increment_lyric_offset,
-        ).pack(side=tk.LEFT, padx=(4, 0))
-
-        action_frame = tk.Frame(self._settings_window, bg=BG_COLOR)
-        action_frame.pack(pady=(8, 0))
-
-        tk.Button(
-            action_frame,
-            text="Apply",
-            width=10,
-            command=self._apply_lyric_offset_from_entry,
-        ).pack(side=tk.LEFT, padx=6)
-        tk.Button(
-            action_frame,
-            text="Close",
-            width=10,
-            command=self._settings_window.destroy,
-        ).pack(side=tk.LEFT, padx=6)
+        self.lyric_offset = value
+        self._offset_update_lock = True
+        self._offset_var.set(f"{self.lyric_offset:.1f}")
+        self._offset_update_lock = False
 
     def _apply_lyric_offset_from_entry(self):
         try:
