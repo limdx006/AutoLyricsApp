@@ -13,8 +13,7 @@ A real-time desktop lyrics player built with Python that detects the currently p
   - Status indicator
 
 <div style="display: flex; gap: 10px;">
-  <img src="https://github.com/user-attachments/assets/6a7dbfed-9201-4d10-8f37-4a9d87a8ba88" width="48%" />
-  <img src="https://github.com/user-attachments/assets/13d12d5a-4f84-4db7-8265-1d63b15e2fe1" width="48%" />
+  <img width="499" height="999" alt="image" src="https://github.com/user-attachments/assets/f81236d6-ba12-4f6a-b465-139614502653" />
 </div>
 
 ---
