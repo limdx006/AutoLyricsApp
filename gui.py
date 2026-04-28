@@ -41,22 +41,8 @@ class LyricsApp:
         self.main_frame.pack_propagate(False)
 
     def _build_info_panel(self):
-        self.info_frame = tk.Frame(self.main_frame, bg=ACCENT_COLOR, height=120)
+        self.info_frame = tk.Frame(self.main_frame, bg=ACCENT_COLOR)
         self.info_frame.pack(fill=tk.X, padx=10, pady=10)
-        self.info_frame.pack_propagate(False)
-
-        self.refresh_btn = tk.Label(
-            self.info_frame,
-            text="⟳",
-            font=("Helvetica", 18),
-            bg=ACCENT_COLOR,
-            fg="#ffffff",
-            cursor="hand2",
-        )
-        self.refresh_btn.place(x=10, y=10)
-        self.refresh_btn.bind("<Button-1>", lambda e: self._on_refresh_btn_clicked())
-        self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
-        self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
 
         self.settings_menu = tk.Menu(self.root, tearoff=0)
         self.settings_menu.add_command(
@@ -64,29 +50,16 @@ class LyricsApp:
             command=self._open_lyric_offset_settings,
         )
 
-        self.settings_btn = tk.Label(
-            self.info_frame,
-            text="⚙",
-            font=("Helvetica", 18),
-            bg=ACCENT_COLOR,
-            fg="#ffffff",
-            cursor="hand2",
-        )
-        self.settings_btn.place(relx=1.0, x=-10, y=10, anchor="ne")
-        self.settings_btn.bind("<Button-1>", self._on_settings_btn_clicked)
-        self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.config(fg="#e94560"))
-        self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.config(fg="#ffffff"))
-
         self.title_label = tk.Label(
             self.info_frame,
             text="No song playing",
             font=("Helvetica", 16, "bold"),
             bg=ACCENT_COLOR,
             fg="#e94560",
-            wraplength=WINDOW_WIDTH - 140,
+            wraplength=WINDOW_WIDTH - 80,
             justify=tk.CENTER,
         )
-        self.title_label.pack(pady=(20, 5), padx=70)
+        self.title_label.pack(pady=(20, 4), padx=20)
 
         self.artist_label = tk.Label(
             self.info_frame,
@@ -94,10 +67,39 @@ class LyricsApp:
             font=("Helvetica", 12),
             bg=ACCENT_COLOR,
             fg="#a0a0a0",
-            wraplength=WINDOW_WIDTH - 140,
+            wraplength=WINDOW_WIDTH - 80,
             justify=tk.CENTER,
         )
-        self.artist_label.pack(padx=70)
+        self.artist_label.pack(padx=20, pady=(0, 8))
+
+        button_row = tk.Frame(self.info_frame, bg=ACCENT_COLOR)
+        button_row.pack(fill=tk.X, padx=10, pady=(0, 12))
+
+        self.refresh_btn = tk.Label(
+            button_row,
+            text="⟳",
+            font=("Helvetica", 18),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.refresh_btn.pack(side=tk.LEFT)
+        self.refresh_btn.bind("<Button-1>", lambda e: self._on_refresh_btn_clicked())
+        self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
+        self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
+
+        self.settings_btn = tk.Label(
+            button_row,
+            text="⚙",
+            font=("Helvetica", 18),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.settings_btn.pack(side=tk.RIGHT)
+        self.settings_btn.bind("<Button-1>", self._on_settings_btn_clicked)
+        self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.config(fg="#e94560"))
+        self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.config(fg="#ffffff"))
 
     def _build_lyrics_panel(self):
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
