@@ -251,6 +251,13 @@ class LyricsApp:
         self.artist_label.config(text=artist or "Unknown Artist")
         self.total_time_label.config(text=format_display_time(duration))
 
+        # Reset lyric offset to the default on each new song
+        self.lyric_offset = 0.3
+        if hasattr(self, "_offset_var"):
+            self._offset_update_lock = True
+            self._offset_var.set(f"{self.lyric_offset:.1f}")
+            self._offset_update_lock = False
+
     def update_progress(self, current, total):
         self.current_time_label.config(text=format_display_time(current))
         if total > 0:
