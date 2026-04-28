@@ -66,6 +66,34 @@ def register_pause_button(app, loop):
     app.set_pause_callback(on_click)
 
 
+async def _next_song_async():
+    # Send a skip-to-next command to the current media session
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        await session.try_skip_next_async()
+
+
+async def _prev_song_async():
+    # Send a skip-to-previous command to the current media session
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if session:
+        await session.try_skip_previous_async()
+
+
+def register_next_prev_buttons(app, loop):
+    """Wire the GUI next and previous buttons to their winsdk commands."""
+    def on_next():
+        asyncio.run_coroutine_threadsafe(_next_song_async(), loop)
+
+    def on_prev():
+        asyncio.run_coroutine_threadsafe(_prev_song_async(), loop)
+
+    app.set_next_callback(on_next)
+    app.set_prev_callback(on_prev)
+
+
 """SYNC SONG - Polls the Windows media session every 500ms to detect song changes,
 pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
 The timeline correction logic below must not be modified — it handles the irregular
@@ -119,7 +147,7 @@ async def sync_song(app):
 
                     # Auto-nudge: pause then resume to force fresh position
                     await session.try_pause_async()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -128,7 +156,7 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     await session.try_play_async()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
