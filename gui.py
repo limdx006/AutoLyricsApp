@@ -7,6 +7,7 @@ from lyrics_utils import format_display_time, COLOR_MAP
 class LyricsApp:
     def __init__(self, root):
         self.root = root
+        self.lyric_offset = 0.3
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
@@ -57,15 +58,35 @@ class LyricsApp:
         self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
         self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
 
+        self.settings_menu = tk.Menu(self.root, tearoff=0)
+        self.settings_menu.add_command(
+            label="Lyric highlight offset",
+            command=self._open_lyric_offset_settings,
+        )
+
+        self.settings_btn = tk.Label(
+            self.info_frame,
+            text="⚙",
+            font=("Helvetica", 18),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.settings_btn.place(relx=1.0, x=-10, y=10, anchor="ne")
+        self.settings_btn.bind("<Button-1>", self._on_settings_btn_clicked)
+        self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.config(fg="#e94560"))
+        self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.config(fg="#ffffff"))
+
         self.title_label = tk.Label(
             self.info_frame,
             text="No song playing",
             font=("Helvetica", 16, "bold"),
             bg=ACCENT_COLOR,
             fg="#e94560",
-            wraplength=WINDOW_WIDTH - 40,
+            wraplength=WINDOW_WIDTH - 140,
+            justify=tk.CENTER,
         )
-        self.title_label.pack(pady=(20, 5))
+        self.title_label.pack(pady=(20, 5), padx=70)
 
         self.artist_label = tk.Label(
             self.info_frame,
@@ -73,8 +94,10 @@ class LyricsApp:
             font=("Helvetica", 12),
             bg=ACCENT_COLOR,
             fg="#a0a0a0",
+            wraplength=WINDOW_WIDTH - 140,
+            justify=tk.CENTER,
         )
-        self.artist_label.pack()
+        self.artist_label.pack(padx=70)
 
     def _build_lyrics_panel(self):
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
@@ -226,6 +249,99 @@ class LyricsApp:
     def _on_refresh_btn_clicked(self):
         if hasattr(self, "_refresh_callback") and self._refresh_callback:
             self._refresh_callback()
+
+    def _on_settings_btn_clicked(self, event=None):
+        self.settings_menu.tk_popup(
+            self.settings_btn.winfo_rootx(),
+            self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height(),
+        )
+
+    def _open_lyric_offset_settings(self):
+        if hasattr(self, "_settings_window") and self._settings_window.winfo_exists():
+            self._settings_window.lift()
+            return
+
+        self._settings_window = tk.Toplevel(self.root)
+        self._settings_window.title("Settings")
+        self._settings_window.geometry("280x140")
+        self._settings_window.configure(bg=BG_COLOR)
+        self._settings_window.resizable(False, False)
+        self._settings_window.transient(self.root)
+
+        tk.Label(
+            self._settings_window,
+            text="Lyric highlight offset",
+            font=("Helvetica", 12, "bold"),
+            bg=BG_COLOR,
+            fg="#ffffff",
+        ).pack(pady=(14, 6))
+
+        self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
+
+        control_frame = tk.Frame(self._settings_window, bg=BG_COLOR)
+        control_frame.pack(pady=6)
+
+        tk.Button(
+            control_frame,
+            text="-",
+            width=3,
+            command=self._decrement_lyric_offset,
+        ).pack(side=tk.LEFT, padx=(0, 4))
+
+        self._offset_entry = tk.Entry(
+            control_frame,
+            textvariable=self._offset_var,
+            width=6,
+            justify=tk.CENTER,
+            font=("Helvetica", 12),
+        )
+        self._offset_entry.pack(side=tk.LEFT)
+        self._offset_entry.bind("<Return>", lambda e: self._apply_lyric_offset_from_entry())
+
+        tk.Button(
+            control_frame,
+            text="+",
+            width=3,
+            command=self._increment_lyric_offset,
+        ).pack(side=tk.LEFT, padx=(4, 0))
+
+        action_frame = tk.Frame(self._settings_window, bg=BG_COLOR)
+        action_frame.pack(pady=(8, 0))
+
+        tk.Button(
+            action_frame,
+            text="Apply",
+            width=10,
+            command=self._apply_lyric_offset_from_entry,
+        ).pack(side=tk.LEFT, padx=6)
+        tk.Button(
+            action_frame,
+            text="Close",
+            width=10,
+            command=self._settings_window.destroy,
+        ).pack(side=tk.LEFT, padx=6)
+
+    def _apply_lyric_offset_from_entry(self):
+        try:
+            value = float(self._offset_var.get())
+        except ValueError:
+            value = self.lyric_offset
+
+        value = round(value, 1)
+        self.lyric_offset = value
+        self._offset_var.set(f"{self.lyric_offset:.1f}")
+
+    def _change_lyric_offset(self, delta: float):
+        value = round(self.lyric_offset + delta, 1)
+        self.lyric_offset = value
+        if hasattr(self, "_offset_var"):
+            self._offset_var.set(f"{self.lyric_offset:.1f}")
+
+    def _increment_lyric_offset(self):
+        self._change_lyric_offset(0.1)
+
+    def _decrement_lyric_offset(self):
+        self._change_lyric_offset(-0.1)
 
     def set_pause_button_state(self, is_paused):
         # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually

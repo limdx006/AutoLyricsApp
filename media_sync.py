@@ -318,9 +318,9 @@ async def progress_clock(app):
                 )
                 last_print = elapsed
 
-            # Advance lyric highlight with +0.3s offset
+# Advance lyric highlight with app-configured offset
             if lyrics_lines:
-                lyric_elapsed = max(0, elapsed + 0.3)
+                lyric_elapsed = max(0, elapsed + app.lyric_offset)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
 
                 # Always update if index changed, including first sync after init
