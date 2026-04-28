@@ -8,6 +8,7 @@ from media_sync import (
     progress_clock,
     register_pause_button,
     register_next_prev_buttons,
+    register_refresh_button,
 )
 
 
@@ -21,9 +22,10 @@ def main():
 
     loop = asyncio.new_event_loop()
 
-    # Wire the pause, next, and previous buttons to the async loop before the thread starts
+    # Wire the pause, next, previous, and refresh buttons to the async loop before the thread starts
     register_pause_button(app, loop)
     register_next_prev_buttons(app, loop)
+    register_refresh_button(app, loop)
 
     def run_async():
         asyncio.set_event_loop(loop)

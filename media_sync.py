@@ -120,6 +120,35 @@ def register_next_prev_buttons(app, loop):
     app.set_prev_callback(on_prev)
 
 
+def register_refresh_button(app, loop):
+    """Wire the GUI refresh button to the async auto-nudge refresh."""
+
+    def on_click():
+        asyncio.run_coroutine_threadsafe(_refresh_sync_async(app), loop)
+
+    app.set_refresh_callback(on_click)
+
+
+async def _refresh_sync_async(app, sleep_delay: float = 0.1):
+    sessions = await MediaManager.request_async()
+    session = sessions.get_current_session()
+    if not session:
+        app.root.after(0, lambda: app.update_status("No media session"))
+        return
+
+    app.root.after(0, lambda: app.update_status("Refreshing..."))
+    new_system_pos = await auto_nudge(session, sleep_delay=sleep_delay)
+
+    if new_system_pos is not None:
+        global last_system_position, last_sync_time, local_position_at_sync, last_accepted_system_pos
+        last_system_position = new_system_pos
+        last_sync_time = time.perf_counter()
+        local_position_at_sync = new_system_pos
+        last_accepted_system_pos = new_system_pos
+
+    app.root.after(0, lambda: app.update_status("Ready"))
+
+
 """SYNC SONG - Polls the Windows media session every 500ms to detect song changes,
 pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
 The timeline correction logic below must not be modified — it handles the irregular
@@ -289,9 +318,9 @@ async def progress_clock(app):
                 )
                 last_print = elapsed
 
-            # Advance lyric highlight with +0.4s offset
+            # Advance lyric highlight with +0.3s offset
             if lyrics_lines:
-                lyric_elapsed = max(0, elapsed + 0.4)
+                lyric_elapsed = max(0, elapsed + 0.3)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
 
                 # Always update if index changed, including first sync after init

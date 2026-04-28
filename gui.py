@@ -44,6 +44,19 @@ class LyricsApp:
         self.info_frame.pack(fill=tk.X, padx=10, pady=10)
         self.info_frame.pack_propagate(False)
 
+        self.refresh_btn = tk.Label(
+            self.info_frame,
+            text="⟳",
+            font=("Helvetica", 18),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+            cursor="hand2",
+        )
+        self.refresh_btn.place(x=10, y=10)
+        self.refresh_btn.bind("<Button-1>", lambda e: self._on_refresh_btn_clicked())
+        self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
+        self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
+
         self.title_label = tk.Label(
             self.info_frame,
             text="No song playing",
@@ -199,6 +212,9 @@ class LyricsApp:
     def set_prev_callback(self, callback):
         self._prev_callback = callback
 
+    def set_refresh_callback(self, callback):
+        self._refresh_callback = callback
+
     def _on_next_btn_clicked(self):
         if hasattr(self, "_next_callback") and self._next_callback:
             self._next_callback()
@@ -206,6 +222,10 @@ class LyricsApp:
     def _on_prev_btn_clicked(self):
         if hasattr(self, "_prev_callback") and self._prev_callback:
             self._prev_callback()
+
+    def _on_refresh_btn_clicked(self):
+        if hasattr(self, "_refresh_callback") and self._refresh_callback:
+            self._refresh_callback()
 
     def set_pause_button_state(self, is_paused):
         # ▶ is a narrower glyph so it needs a larger size to match ▌▌ visually
