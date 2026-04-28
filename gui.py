@@ -329,7 +329,9 @@ class LyricsApp:
         if step < total_steps:
             self._scroll_job = self.root.after(
                 12,
-                lambda: self._animate_scroll(start_ratio, end_ratio, step + 1, total_steps),
+                lambda: self._animate_scroll(
+                    start_ratio, end_ratio, step + 1, total_steps
+                ),
             )
         else:
             self._last_scroll_y = end_ratio

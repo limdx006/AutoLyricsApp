@@ -84,6 +84,7 @@ async def _prev_song_async():
 
 def register_next_prev_buttons(app, loop):
     """Wire the GUI next and previous buttons to their winsdk commands."""
+
     def on_next():
         asyncio.run_coroutine_threadsafe(_next_song_async(), loop)
 
@@ -185,7 +186,9 @@ async def sync_song(app):
 
                 # Calculate the correct starting lyric index after nudge sync
                 if needs_init_wait and lyrics_lines:
-                    start_index = get_current_lyric_index(lyrics_lines, system_pos + 0.3)
+                    start_index = get_current_lyric_index(
+                        lyrics_lines, system_pos + 0.3
+                    )
                 else:
                     start_index = -1
 

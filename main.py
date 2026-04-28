@@ -3,7 +3,12 @@ import threading
 import tkinter as tk
 
 from gui import LyricsApp
-from media_sync import sync_song, progress_clock, register_pause_button, register_next_prev_buttons
+from media_sync import (
+    sync_song,
+    progress_clock,
+    register_pause_button,
+    register_next_prev_buttons,
+)
 
 
 """MAIN - Entry point. Creates the Tkinter window, starts the async media sync
