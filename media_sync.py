@@ -147,7 +147,7 @@ async def sync_song(app):
 
                     # Auto-nudge: pause then resume to force fresh position
                     await session.try_pause_async()
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.02)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
@@ -156,7 +156,7 @@ async def sync_song(app):
                         system_pos = timeline.position.total_seconds()
 
                     await session.try_play_async()
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.02)
 
                     sessions = await MediaManager.request_async()
                     session = sessions.get_current_session()
