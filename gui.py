@@ -8,7 +8,7 @@ class LyricsApp:
     def __init__(self, root):
         self.root = root
         self.lyric_offset = 0.3
-        self.lyric_mode = "romaji"  # Track current lyric mode
+        self.lyric_mode = "original"  # Track current lyric mode
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()

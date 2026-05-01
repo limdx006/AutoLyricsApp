@@ -16,7 +16,7 @@ The GUI is updated exclusively via root.after() to stay thread-safe."""
 
 # CONFIG: Set your preferred lyric mode
 # Options: "original", "romaji", "english" (english uses syncedlyrics lang="en")
-LYRIC_MODE = "romaji"  # Change to "original" or "english" as needed
+LYRIC_MODE = "original" 
 
 # Current track identity
 current_title = None

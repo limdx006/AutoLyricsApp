@@ -25,7 +25,7 @@ PyInstaller.__main__.run([
     '--hidden-import', 'cutlet',
     '--hidden-import', 'pykakasi',
     
-    # Hidden imports - unidic-lite dependencies (CRITICAL for cutlet)
+    # Hidden imports - unidic-lite dependencies (CRITICAL)
     '--hidden-import', 'fugashi',
     '--hidden-import', 'fugashi._fugashi',
     '--hidden-import', 'fugashi._fugashi_legacy',
@@ -33,13 +33,14 @@ PyInstaller.__main__.run([
     '--hidden-import', 'mecab',
     '--hidden-import', 'mecabrc',
     
-    # Collect ALL package data for romaji converters and dependencies
-    '--collect-data', 'unidic_lite',    # Dictionary files for cutlet
-    '--collect-data', 'fugashi',        # MeCab config/data
-    '--collect-data', 'cutlet',         # Cutlet data files
-    '--collect-data', 'pykakasi',       # Pykakasi data files (fallback)
+    # Collect ALL package data for unidic-lite and its dependencies
+    # This ensures the dictionary files are bundled
+    '--collect-data', 'unidic_lite',
+    '--collect-data', 'fugashi',
+    '--collect-data', 'cutlet',
+    '--collect-data', 'pykakasi',
     
-    # Collect binaries (compiled C extensions) for fugashi/mecab
+    # Also collect binaries (compiled C extensions) for fugashi/mecab
     '--collect-binaries', 'fugashi',
     '--collect-binaries', 'mecab',
     
