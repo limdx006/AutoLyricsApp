@@ -16,18 +16,36 @@ PyInstaller.__main__.run([
     '--add-data', 'icon.ico;.',         # Runtime access
     '--icon', 'icon.ico',               # Embedded in .exe resources
     
-    # Hidden imports
+    # Hidden imports - core libraries
     '--hidden-import', 'winsdk',
     '--hidden-import', 'syncedlyrics',
     '--hidden-import', 'tkinter',
+    
+    # Hidden imports - romaji conversion
     '--hidden-import', 'cutlet',
     '--hidden-import', 'pykakasi',
+    
+    # Hidden imports - unidic-lite dependencies (CRITICAL for cutlet)
     '--hidden-import', 'fugashi',
+    '--hidden-import', 'fugashi._fugashi',
+    '--hidden-import', 'fugashi._fugashi_legacy',
     '--hidden-import', 'unidic_lite',
-
-    # Ensure all package data for romaji conversion is bundled
-    '--collect-data', 'pykakasi',
-    '--collect-data', 'unidic_lite',
-    '--collect-data', 'cutlet',
-    '--collect-data', 'fugashi',
+    '--hidden-import', 'mecab',
+    '--hidden-import', 'mecabrc',
+    
+    # Collect ALL package data for romaji converters and dependencies
+    '--collect-data', 'unidic_lite',    # Dictionary files for cutlet
+    '--collect-data', 'fugashi',        # MeCab config/data
+    '--collect-data', 'cutlet',         # Cutlet data files
+    '--collect-data', 'pykakasi',       # Pykakasi data files (fallback)
+    
+    # Collect binaries (compiled C extensions) for fugashi/mecab
+    '--collect-binaries', 'fugashi',
+    '--collect-binaries', 'mecab',
+    
+    # Collect submodules that might be dynamically imported
+    '--collect-submodules', 'unidic_lite',
+    '--collect-submodules', 'fugashi',
+    '--collect-submodules', 'cutlet',
+    '--collect-submodules', 'pykakasi',
 ])
