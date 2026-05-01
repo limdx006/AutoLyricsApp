@@ -1,6 +1,8 @@
 import asyncio
 import threading
 import tkinter as tk
+import os
+import sys
 
 from gui import LyricsApp
 from media_sync import (
@@ -12,6 +14,14 @@ from media_sync import (
 )
 
 
+def _resource_path(filename):
+    """Return the correct path to a bundled file whether running from source or as a PyInstaller exe."""
+    if hasattr(sys, "_MEIPASS"):
+        # Running inside a PyInstaller bundle — files are extracted to a temp folder
+        return os.path.join(sys._MEIPASS, filename)
+    return os.path.join(os.path.dirname(__file__), filename)
+
+
 """MAIN - Entry point. Creates the Tkinter window, starts the async media sync
 loops on a background thread, then hands control to the Tkinter event loop."""
 
@@ -19,6 +29,11 @@ loops on a background thread, then hands control to the Tkinter event loop."""
 def main():
     root = tk.Tk()
     app = LyricsApp(root)
+
+    # Set window icon (title bar + taskbar)
+    icon_path = _resource_path("icon.ico")
+    if os.path.exists(icon_path):
+        root.iconbitmap(icon_path)
 
     loop = asyncio.new_event_loop()
 
