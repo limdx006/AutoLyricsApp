@@ -24,14 +24,8 @@ PyInstaller.__main__.run([
     # Hidden imports - romaji conversion
     '--hidden-import', 'cutlet',
     '--hidden-import', 'pykakasi',
-    
-    # Hidden imports - unidic-lite dependencies (CRITICAL)
     '--hidden-import', 'fugashi',
-    '--hidden-import', 'fugashi._fugashi',
-    '--hidden-import', 'fugashi._fugashi_legacy',
     '--hidden-import', 'unidic_lite',
-    '--hidden-import', 'mecab',
-    '--hidden-import', 'mecabrc',
     
     # Collect ALL package data for unidic-lite and its dependencies
     # This ensures the dictionary files are bundled
@@ -43,7 +37,7 @@ PyInstaller.__main__.run([
     # Also collect binaries (compiled C extensions) for fugashi/mecab
     '--collect-binaries', 'fugashi',
     '--collect-binaries', 'mecab',
-    
+     
     # Collect submodules that might be dynamically imported
     '--collect-submodules', 'unidic_lite',
     '--collect-submodules', 'fugashi',
