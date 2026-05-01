@@ -14,15 +14,32 @@ from lyrics_utils import parse_lrc, get_current_lyric_index
 The two async loops (sync_song and progress_clock) read and write these variables.
 The GUI is updated exclusively via root.after() to stay thread-safe."""
 
+# CONFIG: Set your preferred lyric mode
+# Options: "original", "romaji", "english" (english uses syncedlyrics lang="en")
+LYRIC_MODE = "romaji"  # Change to "original" or "english" as needed
+
 # Current track identity
 current_title = None
 current_artist = None
 song_duration = 0
 
+# Function to change lyric mode at runtime
+def set_lyric_mode(mode):
+    """Change the lyric mode and return True if successful."""
+    global LYRIC_MODE
+    if mode in ["original", "romaji", "english"]:
+        LYRIC_MODE = mode
+        return True
+    return False
+
+def get_lyric_mode():
+    """Get the current lyric mode."""
+    return LYRIC_MODE
+
 # Timeline sync state
-last_system_position = 0  # Position at time of last sync
-last_sync_time = 0  # perf_counter() at time of last sync
-local_position_at_sync = 0  # Local mirror of position at last sync point
+last_system_position = 0
+last_sync_time = 0
+local_position_at_sync = 0
 last_accepted_system_pos = 0
 
 # Pause tracking
@@ -34,7 +51,61 @@ is_initialized = False
 lyrics_lines = []
 
 
-# High-precision async sleep for Windows (avoids 15ms asyncio granularity)
+# Initialize romaji converter (lazy load to avoid import overhead if not needed)
+_romaji_engine = None
+_romaji_backend = None
+
+def get_romaji_engine():
+    """Lazy-load a romaji converter using cutlet first, then pykakasi."""
+    global _romaji_engine, _romaji_backend
+    if _romaji_engine is not None:
+        return _romaji_engine
+
+    try:
+        import cutlet
+        _romaji_engine = cutlet.Cutlet()
+        _romaji_backend = "cutlet"
+        return _romaji_engine
+    except Exception as e:
+        print("cutlet initialization failed, falling back to pykakasi:", e)
+
+    try:
+        from pykakasi import kakasi
+        kakasi_obj = kakasi()
+        kakasi_obj.setMode("J", "a")
+        kakasi_obj.setMode("K", "a")
+        kakasi_obj.setMode("H", "a")
+        kakasi_obj.setMode("a", "a")
+        kakasi_obj.setMode("s", True)
+        _romaji_engine = kakasi_obj.getConverter()
+        _romaji_backend = "pykakasi"
+        print("Using pykakasi for romaji conversion")
+        return _romaji_engine
+    except Exception as e:
+        print("pykakasi initialization failed:", e)
+        _romaji_engine = None
+        _romaji_backend = None
+        return None
+
+
+def convert_to_romaji(text):
+    """Convert Japanese text to romaji using the available converter."""
+    engine = get_romaji_engine()
+    if not engine:
+        return text
+
+    try:
+        if _romaji_backend == "cutlet":
+            return engine.romaji(text)
+        if _romaji_backend == "pykakasi":
+            return engine.do(text)
+    except Exception:
+        pass
+
+    return text
+
+
+# High-precision async sleep for Windows
 async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
@@ -64,15 +135,84 @@ async def auto_nudge(session, sleep_delay: float = 0.02):
     return system_pos
 
 
-# Fetch synced LRC lyrics for a search query
 def get_synced_lyrics(query):
+    """Fetch lyrics. If romaji mode, fetch original Japanese then convert."""
     try:
+        # Fetch original lyrics (no lang parameter for reliability)
         lrc = syncedlyrics.search(query)
-        return (
-            lrc if lrc else None
-        )  # Return None instead of string for cleaner handling
+        
+        if not lrc:
+            return None
+            
+        # If romaji mode, convert each line to romaji
+        if LYRIC_MODE == "romaji":
+            lines = lrc.strip().split("\n")
+            converted_lines = []
+            
+            for line in lines:
+                # Parse the timestamp part [mm:ss.xx]
+                import re
+                match = re.match(r"(\[\d{2}:\d{2}\.\d{2,3}\])(.*)", line)
+                if match:
+                    timestamp = match.group(1)
+                    text = match.group(2).strip()
+                    romaji_text = convert_to_romaji(text)
+                    converted_lines.append(f"{timestamp}{romaji_text}")
+                else:
+                    converted_lines.append(line)
+            
+            return "\n".join(converted_lines)
+        
+        # If english mode, try with lang parameter (may fail, fallback to original)
+        elif LYRIC_MODE == "english":
+            try:
+                lrc_en = syncedlyrics.search(query, lang="en")
+                if lrc_en:
+                    return lrc_en
+            except Exception:
+                pass  # Fallback to original
+            return lrc
+        
+        # Original mode — just return as-is
+        else:
+            return lrc
+            
     except Exception:
         return None
+
+
+async def _refresh_lyrics_async(app):
+    """Refresh lyrics for the current song with the current LYRIC_MODE."""
+    global lyrics_lines, current_title, current_artist, is_initialized
+    
+    if not current_title or not is_initialized:
+        return
+    
+    app.root.after(0, lambda: app.update_status("Refreshing lyrics..."))
+    
+    query = f"{current_title} {current_artist}"
+    lrc_text = get_synced_lyrics(query)
+    
+    if lrc_text:
+        from lyrics_utils import parse_lrc
+        lyrics_lines = parse_lrc(lrc_text)
+        lyrics_snapshot = lyrics_lines.copy()
+        app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l, -1))
+    else:
+        app.root.after(0, app.clear_lyrics)
+    
+    app.root.after(0, lambda: app.update_status("Ready"))
+
+
+def register_lyric_mode_change(app, loop):
+    """Register a callback for changing lyric mode from the GUI."""
+    
+    def on_mode_change(mode):
+        if set_lyric_mode(mode):
+            asyncio.run_coroutine_threadsafe(_refresh_lyrics_async(app), loop)
+    
+    # Store the callback on the app so the GUI can call it
+    app.set_lyric_mode_callback = on_mode_change
 
 
 async def _toggle_play_pause_async():
@@ -92,7 +232,6 @@ def register_pause_button(app, loop):
 
 
 async def _next_song_async():
-    # Send a skip-to-next command to the current media session
     sessions = await MediaManager.request_async()
     session = sessions.get_current_session()
     if session:
@@ -100,7 +239,6 @@ async def _next_song_async():
 
 
 async def _prev_song_async():
-    # Send a skip-to-previous command to the current media session
     sessions = await MediaManager.request_async()
     session = sessions.get_current_session()
     if session:
@@ -149,12 +287,6 @@ async def _refresh_sync_async(app, sleep_delay: float = 0.1):
     app.root.after(0, lambda: app.update_status("Ready"))
 
 
-"""SYNC SONG - Polls the Windows media session every 500ms to detect song changes,
-pause/resume events, and user seeks. Updates globals and schedules GUI refreshes.
-The timeline correction logic below must not be modified — it handles the irregular
-update cadence of the Windows media session API."""
-
-
 async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
@@ -187,7 +319,6 @@ async def sync_song(app):
                 is_paused = False
                 lyrics_lines = []
 
-                # Refresh song header and clear old lyrics immediately
                 app.root.after(
                     0,
                     lambda t=title, a=artist, d=duration: app.update_song_info(t, a, d),
@@ -209,17 +340,14 @@ async def sync_song(app):
                 local_position_at_sync = system_pos
                 last_accepted_system_pos = system_pos
 
-                # Fetch and parse lyrics, then hand them to the GUI
                 query = f"{title} {artist}"
                 lrc_text = get_synced_lyrics(query)
 
-                # Handle None return cleanly
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
                 else:
                     lyrics_lines = []
 
-                # Calculate the correct starting lyric index after nudge sync
                 if should_initialise and lyrics_lines:
                     start_index = get_current_lyric_index(
                         lyrics_lines, system_pos + 0.3
@@ -227,7 +355,6 @@ async def sync_song(app):
                 else:
                     start_index = -1
 
-                # Pass a COPY of lyrics_lines and the starting index to avoid race condition
                 lyrics_snapshot = lyrics_lines.copy()
                 app.root.after(
                     0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
@@ -235,7 +362,6 @@ async def sync_song(app):
                 app.root.after(0, lambda: app.update_status("Ready"))
 
             else:
-                # pause detection
                 if not currently_playing and not is_paused:
                     is_paused = True
                     paused_position = local_position_at_sync + (
@@ -254,7 +380,6 @@ async def sync_song(app):
                     app.root.after(0, lambda: app.set_pause_button_state(False))
                     continue
 
-                # timeline correction (do not modify)
                 if is_paused or not is_initialized:
                     pass
                 else:
@@ -311,19 +436,16 @@ async def progress_clock(app):
 
             elapsed = min(elapsed, song_duration)
 
-            # Update progress bar every 100ms
             if int(elapsed * 10) != int(last_print * 10):
                 app.root.after(
                     0, lambda e=elapsed, d=song_duration: app.update_progress(e, d)
                 )
                 last_print = elapsed
 
-# Advance lyric highlight with app-configured offset
             if lyrics_lines:
                 lyric_elapsed = max(0, elapsed + app.lyric_offset)
                 new_index = get_current_lyric_index(lyrics_lines, lyric_elapsed)
 
-                # Always update if index changed, including first sync after init
                 if new_index != last_lyric_idx:
                     last_lyric_idx = new_index
                     app.root.after(0, lambda i=new_index: app.highlight_lyric(i))

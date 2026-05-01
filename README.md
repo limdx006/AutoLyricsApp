@@ -98,7 +98,7 @@ cd AutoLyricsApp
 
 **2. Install dependencies**
 ```bash
-pip install syncedlyrics winsdk pyinstaller
+pip install syncedlyrics winsdk pyinstaller pykakasi unidic-lite
 ```
 
 **3. Run directly**

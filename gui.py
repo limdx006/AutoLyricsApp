@@ -8,6 +8,7 @@ class LyricsApp:
     def __init__(self, root):
         self.root = root
         self.lyric_offset = 0.3
+        self.lyric_mode = "romaji"  # Track current lyric mode
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
@@ -46,8 +47,19 @@ class LyricsApp:
 
         self.settings_menu = tk.Menu(self.root, tearoff=0)
         self.settings_menu.add_command(
-            label="No settings available",
+            label="Lyric Language:",
             state="disabled",
+        )
+        self.settings_menu.add_separator()
+        
+        # Add lyric mode options
+        self.settings_menu.add_command(
+            label="Japanese (Original)",
+            command=lambda: self._on_lyric_mode_selected("original"),
+        )
+        self.settings_menu.add_command(
+            label="Romaji (Roman Letters)",
+            command=lambda: self._on_lyric_mode_selected("romaji"),
         )
 
         self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
@@ -301,6 +313,13 @@ class LyricsApp:
             self.settings_btn.winfo_rootx(),
             self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height(),
         )
+
+    def _on_lyric_mode_selected(self, mode):
+        """Handle lyric mode selection from the settings menu."""
+        self.lyric_mode = mode
+        # Call the callback set by media_sync if it exists
+        if hasattr(self, "set_lyric_mode_callback") and self.set_lyric_mode_callback:
+            self.set_lyric_mode_callback(mode)
 
     def _on_offset_var_changed(self, *args):
         if getattr(self, "_offset_update_lock", False):

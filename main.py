@@ -11,6 +11,7 @@ from media_sync import (
     register_pause_button,
     register_next_prev_buttons,
     register_refresh_button,
+    register_lyric_mode_change,
 )
 
 
@@ -41,6 +42,7 @@ def main():
     register_pause_button(app, loop)
     register_next_prev_buttons(app, loop)
     register_refresh_button(app, loop)
+    register_lyric_mode_change(app, loop)
 
     def run_async():
         asyncio.set_event_loop(loop)

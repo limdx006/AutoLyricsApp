@@ -20,4 +20,14 @@ PyInstaller.__main__.run([
     '--hidden-import', 'winsdk',
     '--hidden-import', 'syncedlyrics',
     '--hidden-import', 'tkinter',
+    '--hidden-import', 'cutlet',
+    '--hidden-import', 'pykakasi',
+    '--hidden-import', 'fugashi',
+    '--hidden-import', 'unidic_lite',
+
+    # Ensure all package data for romaji conversion is bundled
+    '--collect-data', 'pykakasi',
+    '--collect-data', 'unidic_lite',
+    '--collect-data', 'cutlet',
+    '--collect-data', 'fugashi',
 ])
