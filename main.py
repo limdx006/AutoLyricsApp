@@ -1,4 +1,4 @@
-"""
+r"""
 LyricsPlayer - Auto-synced lyrics display application.
 
 Citation for syncedlyrics library:
