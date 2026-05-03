@@ -20,6 +20,7 @@ class LyricsApp:
         )
         self._build_window()
         self._build_info_panel()
+        self._build_translation_bar()
         self._build_lyrics_panel()
         self._build_progress_bar()
 
@@ -55,16 +56,7 @@ class LyricsApp:
         self.info_frame.pack(fill=tk.X, padx=10, pady=10)
 
         self.settings_menu = tk.Menu(self.root, tearoff=0)
-        self.settings_menu.add_command(
-            label="Lyric Language:",
-            state="disabled",
-        )
-        self.settings_menu.add_separator()
-        self.settings_menu.add_command(
-            label="Original",
-            command=lambda: self._on_lyric_mode_selected("original"),
-        )
-        # Translation options are added dynamically via set_detected_language()
+        # Translation options removed — handled by the translation bar below the info panel
 
         self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
         self._offset_var.trace_add("write", self._on_offset_var_changed)
@@ -161,6 +153,99 @@ class LyricsApp:
         self.settings_btn.bind(
             "<Leave>", lambda e: self.settings_btn.config(fg="#ffffff")
         )
+
+    def _build_translation_bar(self):
+        # Thin strip between info panel and lyrics showing language info and translation toggle
+        self.translation_bar = tk.Frame(self.main_frame, bg=ACCENT_COLOR, height=32)
+        self.translation_bar.pack(fill=tk.X, padx=10, pady=(0, 4))
+        self.translation_bar.pack_propagate(False)
+
+        # Language: ___
+        tk.Label(
+            self.translation_bar,
+            text="Language:",
+            font=("Helvetica", 9),
+            bg=ACCENT_COLOR,
+            fg="#a0a0a0",
+        ).pack(side=tk.LEFT, padx=(10, 2))
+
+        self.lang_value_label = tk.Label(
+            self.translation_bar,
+            text="—",
+            font=("Helvetica", 9, "bold"),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+        )
+        self.lang_value_label.pack(side=tk.LEFT, padx=(0, 14))
+
+        # Current: Original / translated name
+        tk.Label(
+            self.translation_bar,
+            text="Current:",
+            font=("Helvetica", 9),
+            bg=ACCENT_COLOR,
+            fg="#a0a0a0",
+        ).pack(side=tk.LEFT, padx=(0, 2))
+
+        self.mode_value_label = tk.Label(
+            self.translation_bar,
+            text="Original",
+            font=("Helvetica", 9, "bold"),
+            bg=ACCENT_COLOR,
+            fg="#ffffff",
+        )
+        self.mode_value_label.pack(side=tk.LEFT)
+
+        # Translation toggle buttons on the right — shown only for translatable languages
+        self.trans_btn_original = tk.Label(
+            self.translation_bar,
+            text="[ Ori ]",
+            font=("Helvetica", 9, "bold"),
+            bg=ACCENT_COLOR,
+            fg="#e94560",  # active by default
+            cursor="hand2",
+        )
+        self.trans_btn_original.pack(side=tk.RIGHT, padx=(0, 6))
+        self.trans_btn_original.bind(
+            "<Button-1>", lambda e: self._on_translation_toggle("original")
+        )
+
+        self.trans_btn_translated = tk.Label(
+            self.translation_bar,
+            text="[ Rom ]",
+            font=("Helvetica", 9),
+            bg=ACCENT_COLOR,
+            fg="#555555",  # inactive by default
+            cursor="hand2",
+        )
+        self.trans_btn_translated.pack(side=tk.RIGHT, padx=(0, 4))
+        self.trans_btn_translated.bind(
+            "<Button-1>", lambda e: self._on_translation_toggle(self._translation_mode)
+        )
+        # Hidden until a translatable language is detected
+        self.trans_btn_translated.pack_forget()
+
+        # Stores the target mode for the translated button
+        self._translation_mode = None
+
+    def _on_translation_toggle(self, mode):
+        # Forward to mode selector and refresh bar visuals
+        self._on_lyric_mode_selected(mode)
+        self._update_translation_bar_state()
+
+    def _update_translation_bar_state(self):
+        """Refresh button colours and Current label to reflect the active lyric_mode."""
+        is_original = self.lyric_mode == "original"
+        self.trans_btn_original.config(fg="#e94560" if is_original else "#555555")
+        self.trans_btn_translated.config(fg="#e94560" if not is_original else "#555555")
+
+        mode_names = {
+            "original": "Original",
+            "romaji": "Romaji",
+            "pinyin": "Pinyin",
+            "romaja": "Romaja",
+        }
+        self.mode_value_label.config(text=mode_names.get(self.lyric_mode, "Original"))
 
     def _build_lyrics_panel(self):
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
@@ -327,45 +412,41 @@ class LyricsApp:
         )
 
     def _on_lyric_mode_selected(self, mode):
-        """Handle lyric mode selection from the settings menu."""
+        """Handle lyric mode selection from the settings menu or translation bar."""
         self.lyric_mode = mode
-        # Call the callback set by media_sync if it exists
+        self._update_translation_bar_state()
         if hasattr(self, "set_lyric_mode_callback") and self.set_lyric_mode_callback:
             self.set_lyric_mode_callback(mode)
 
     def set_detected_language(self, language):
         """Called after lyrics are loaded with the detected language.
-        Rebuilds the settings menu translation options to match the song language.
-        Only shows translation options relevant to the current song."""
+        Updates the translation bar and resets lyric mode to original for the new song.
+        """
         self._detected_language = language
         self.lyric_mode = "original"
 
-        # Remove all entries after the separator (index 2 onward) and rebuild
-        last = self.settings_menu.index(tk.END)
-        if last is not None:
-            for i in range(last, 1, -1):
-                self.settings_menu.delete(i)
-
-        self.settings_menu.add_command(
-            label="Original",
-            command=lambda: self._on_lyric_mode_selected("original"),
+        # Map language code to a display name and the translated mode string
+        lang_display = {
+            "japanese": ("Japanese", "romaji", "[ Rom ]"),
+            "chinese": ("Chinese", "pinyin", "[ Pin ]"),
+            "korean": ("Korean", "romaja", "[ Rom ]"),
+            "other": ("Other", None, None),
+        }
+        display_name, trans_mode, btn_label = lang_display.get(
+            language, ("Other", None, None)
         )
 
-        if language == "japanese":
-            self.settings_menu.add_command(
-                label="Romaji (Roman Letters)",
-                command=lambda: self._on_lyric_mode_selected("romaji"),
-            )
-        elif language == "chinese":
-            self.settings_menu.add_command(
-                label="Pinyin",
-                command=lambda: self._on_lyric_mode_selected("pinyin"),
-            )
-        elif language == "korean":
-            self.settings_menu.add_command(
-                label="Romaja (Roman Letters)",
-                command=lambda: self._on_lyric_mode_selected("romaja"),
-            )
+        self.lang_value_label.config(text=display_name)
+        self._translation_mode = trans_mode
+
+        if trans_mode:
+            self.trans_btn_translated.config(text=btn_label)
+            self.trans_btn_translated.pack(side=tk.RIGHT, padx=(0, 4))
+        else:
+            self.trans_btn_translated.pack_forget()
+
+        # Reset bar visuals to Original state
+        self._update_translation_bar_state()
 
     def _on_offset_var_changed(self, *args):
         if getattr(self, "_offset_update_lock", False):
