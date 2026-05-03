@@ -6,9 +6,17 @@ A real-time desktop lyrics player built with Python that detects the currently p
 
 ## 🖼 UI Overview
 
-<div style="display: flex; gap: 10px;">
-  <img width="499" height="999" alt="image" src="https://github.com/user-attachments/assets/f81236d6-ba12-4f6a-b465-139614502653" />
-</div>
+
+<table>
+  <tr>
+    <td>
+      <img width="496" src="https://github.com/user-attachments/assets/b189f3f0-74e1-431f-ace1-d88e5bee8c45" />
+    </td>
+    <td>
+      <img width="495" src="https://github.com/user-attachments/assets/6f6c8b59-af15-4be2-911b-720d2189167b" />
+    </td>
+  </tr>
+</table>
 
 ---
 
