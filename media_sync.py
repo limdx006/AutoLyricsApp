@@ -9,32 +9,34 @@ from winsdk.windows.media.control import (
 
 from lyrics_utils import parse_lrc, get_current_lyric_index, detect_language
 
-
 """MEDIA SYNC - All mutable playback state lives here as module-level globals.
 The two async loops (sync_song and progress_clock) read and write these variables.
 The GUI is updated exclusively via root.after() to stay thread-safe."""
 
 # CONFIG: Set your preferred lyric mode
-# Options: "original", "romaji", "english" (english uses syncedlyrics lang="en")
-LYRIC_MODE = "original" 
+# Options: "original", "romaji", "romaja", "english" (english uses syncedlyrics lang="en")
+LYRIC_MODE = "original"
 
 # Current track identity
 current_title = None
 current_artist = None
 song_duration = 0
 
+
 # Function to change lyric mode at runtime
 def set_lyric_mode(mode):
     """Change the lyric mode and return True if successful."""
     global LYRIC_MODE
-    if mode in ["original", "romaji", "english"]:
+    if mode in ["original", "romaji", "romaja", "english"]:
         LYRIC_MODE = mode
         return True
     return False
 
+
 def get_lyric_mode():
     """Get the current lyric mode."""
     return LYRIC_MODE
+
 
 # Timeline sync state
 last_system_position = 0
@@ -55,6 +57,10 @@ lyrics_lines = []
 _romaji_engine = None
 _romaji_backend = None
 
+# Initialize Korean romanizer (lazy load)
+_korean_romanizer = None
+
+
 def get_romaji_engine():
     """Lazy-load a romaji converter using cutlet first, then pykakasi."""
     global _romaji_engine, _romaji_backend
@@ -63,6 +69,7 @@ def get_romaji_engine():
 
     try:
         import cutlet
+
         _romaji_engine = cutlet.Cutlet()
         _romaji_backend = "cutlet"
         return _romaji_engine
@@ -71,6 +78,7 @@ def get_romaji_engine():
 
     try:
         from pykakasi import kakasi
+
         kakasi_obj = kakasi()
         kakasi_obj.setMode("J", "a")
         kakasi_obj.setMode("K", "a")
@@ -85,6 +93,22 @@ def get_romaji_engine():
         print("pykakasi initialization failed:", e)
         _romaji_engine = None
         _romaji_backend = None
+        return None
+
+
+def get_korean_romanizer():
+    """Lazy-load the Korean romanizer."""
+    global _korean_romanizer
+    if _korean_romanizer is not None:
+        return _korean_romanizer
+    try:
+        from korean_romanizer.romanizer import Romanizer
+
+        _korean_romanizer = Romanizer
+        return _korean_romanizer
+    except Exception as e:
+        print("korean-romanizer initialization failed:", e)
+        _korean_romanizer = None
         return None
 
 
@@ -103,6 +127,18 @@ def convert_to_romaji(text):
         pass
 
     return text
+
+
+def convert_to_romaja(text):
+    """Convert Korean text to Revised Romanization (Romaja)."""
+    Romanizer = get_korean_romanizer()
+    if not Romanizer:
+        return text
+    try:
+        r = Romanizer(text)
+        return r.romanize()
+    except Exception:
+        return text
 
 
 # High-precision async sleep for Windows
@@ -136,22 +172,24 @@ async def auto_nudge(session, sleep_delay: float = 0.02):
 
 
 def get_synced_lyrics(query):
-    """Fetch lyrics. If romaji mode, fetch original Japanese then convert."""
+    """Fetch lyrics. If romaji mode, fetch original Japanese then convert.
+    If romaja mode, fetch original Korean then convert."""
     try:
         # Fetch original lyrics (no lang parameter for reliability)
         lrc = syncedlyrics.search(query)
-        
+
         if not lrc:
             return None
-            
+
         # If romaji mode, convert each line to romaji
         if LYRIC_MODE == "romaji":
             lines = lrc.strip().split("\n")
             converted_lines = []
-            
+
             for line in lines:
                 # Parse the timestamp part [mm:ss.xx]
                 import re
+
                 match = re.match(r"(\[\d{2}:\d{2}\.\d{2,3}\])(.*)", line)
                 if match:
                     timestamp = match.group(1)
@@ -160,9 +198,28 @@ def get_synced_lyrics(query):
                     converted_lines.append(f"{timestamp}{romaji_text}")
                 else:
                     converted_lines.append(line)
-            
+
             return "\n".join(converted_lines)
-        
+
+        # If romaja mode, convert each line to Korean Romaja
+        elif LYRIC_MODE == "romaja":
+            lines = lrc.strip().split("\n")
+            converted_lines = []
+
+            for line in lines:
+                import re
+
+                match = re.match(r"(\[\d{2}:\d{2}\.\d{2,3}\])(.*)", line)
+                if match:
+                    timestamp = match.group(1)
+                    text = match.group(2).strip()
+                    romaja_text = convert_to_romaja(text)
+                    converted_lines.append(f"{timestamp}{romaja_text}")
+                else:
+                    converted_lines.append(line)
+
+            return "\n".join(converted_lines)
+
         # If english mode, try with lang parameter (may fail, fallback to original)
         elif LYRIC_MODE == "english":
             try:
@@ -172,11 +229,11 @@ def get_synced_lyrics(query):
             except Exception:
                 pass  # Fallback to original
             return lrc
-        
+
         # Original mode — just return as-is
         else:
             return lrc
-            
+
     except Exception:
         return None
 
@@ -184,33 +241,34 @@ def get_synced_lyrics(query):
 async def _refresh_lyrics_async(app):
     """Refresh lyrics for the current song with the current LYRIC_MODE."""
     global lyrics_lines, current_title, current_artist, is_initialized
-    
+
     if not current_title or not is_initialized:
         return
-    
+
     app.root.after(0, lambda: app.update_status("Refreshing lyrics..."))
-    
+
     query = f"{current_title} {current_artist}"
     lrc_text = get_synced_lyrics(query)
-    
+
     if lrc_text:
         from lyrics_utils import parse_lrc
+
         lyrics_lines = parse_lrc(lrc_text)
         lyrics_snapshot = lyrics_lines.copy()
         app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l, -1))
     else:
         app.root.after(0, app.clear_lyrics)
-    
+
     app.root.after(0, lambda: app.update_status("Ready"))
 
 
 def register_lyric_mode_change(app, loop):
     """Register a callback for changing lyric mode from the GUI."""
-    
+
     def on_mode_change(mode):
         if set_lyric_mode(mode):
             asyncio.run_coroutine_threadsafe(_refresh_lyrics_async(app), loop)
-    
+
     # Store the callback on the app so the GUI can call it
     app.set_lyric_mode_callback = on_mode_change
 
@@ -269,6 +327,7 @@ def register_refresh_button(app, loop):
 
 def register_lyric_mode_change(app, loop):
     """Wire the GUI lyric mode selector so changing mode reloads the current lyrics."""
+
     def on_mode_change(mode):
         # Reload lyrics with the new mode — runs on the Tkinter thread via after()
         if hasattr(app, "_current_lyrics_snapshot") and app._current_lyrics_snapshot:
@@ -378,9 +437,7 @@ async def sync_song(app):
                 app._current_lyrics_snapshot = lyrics_snapshot
 
                 # Push detected language first so menu and mode are ready before load
-                app.root.after(
-                    0, lambda lang=language: app.set_detected_language(lang)
-                )
+                app.root.after(0, lambda lang=language: app.set_detected_language(lang))
                 app.root.after(
                     0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
                 )

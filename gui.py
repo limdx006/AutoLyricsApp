@@ -1,7 +1,13 @@
 import tkinter as tk
 
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, BG_COLOR, ACCENT_COLOR
-from lyrics_utils import format_display_time, COLOR_MAP, to_romaji, to_pinyin
+from lyrics_utils import (
+    format_display_time,
+    COLOR_MAP,
+    to_romaji,
+    to_pinyin,
+    to_romanized_korean,
+)
 
 
 class LyricsApp:
@@ -9,7 +15,9 @@ class LyricsApp:
         self.root = root
         self.lyric_offset = 0.3
         self.lyric_mode = "original"
-        self._detected_language = "other"  # Set after lyrics load: 'japanese', 'chinese', 'other'
+        self._detected_language = (
+            "other"  # Set after lyrics load: 'japanese', 'chinese', 'korean', 'other'
+        )
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
@@ -96,8 +104,12 @@ class LyricsApp:
         )
         self.refresh_btn.pack(side=tk.LEFT)
         self.refresh_btn.bind("<Button-1>", lambda e: self._on_refresh_btn_clicked())
-        self.refresh_btn.bind("<Enter>", lambda e: self.refresh_btn.config(fg="#e94560"))
-        self.refresh_btn.bind("<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff"))
+        self.refresh_btn.bind(
+            "<Enter>", lambda e: self.refresh_btn.config(fg="#e94560")
+        )
+        self.refresh_btn.bind(
+            "<Leave>", lambda e: self.refresh_btn.config(fg="#ffffff")
+        )
 
         offset_frame = tk.Frame(button_row, bg=ACCENT_COLOR)
         offset_frame.pack(side=tk.LEFT, expand=True)
@@ -143,8 +155,12 @@ class LyricsApp:
         )
         self.settings_btn.pack(side=tk.RIGHT)
         self.settings_btn.bind("<Button-1>", self._on_settings_btn_clicked)
-        self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.config(fg="#e94560"))
-        self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.config(fg="#ffffff"))
+        self.settings_btn.bind(
+            "<Enter>", lambda e: self.settings_btn.config(fg="#e94560")
+        )
+        self.settings_btn.bind(
+            "<Leave>", lambda e: self.settings_btn.config(fg="#ffffff")
+        )
 
     def _build_lyrics_panel(self):
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
@@ -345,6 +361,11 @@ class LyricsApp:
                 label="Pinyin",
                 command=lambda: self._on_lyric_mode_selected("pinyin"),
             )
+        elif language == "korean":
+            self.settings_menu.add_command(
+                label="Romaja (Roman Letters)",
+                command=lambda: self._on_lyric_mode_selected("romaja"),
+            )
 
     def _on_offset_var_changed(self, *args):
         if getattr(self, "_offset_update_lock", False):
@@ -437,6 +458,8 @@ class LyricsApp:
                 display_text = to_romaji(text)
             elif self.lyric_mode == "pinyin" and self._detected_language == "chinese":
                 display_text = to_pinyin(text)
+            elif self.lyric_mode == "romaja" and self._detected_language == "korean":
+                display_text = to_romanized_korean(text)
             else:
                 display_text = text
 
