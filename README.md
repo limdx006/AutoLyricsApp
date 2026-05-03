@@ -6,7 +6,6 @@ A real-time desktop lyrics player built with Python that detects the currently p
 
 ## 🖼 UI Overview
 
-
 <table>
   <tr>
     <td>
@@ -38,9 +37,19 @@ A real-time desktop lyrics player built with Python that detects the currently p
 - Adjustable **lyric offset** (±0.1s steps) to fine-tune sync per song
 - Lyric offset resets to default on each new song
 
+### 🌐 Lyric Translation
+- Auto-detects the song language from the lyrics text
+- A **translation bar** below the info panel shows the detected language, current display mode, and toggle buttons
+- Supports three languages with one-click romanisation:
+  - 🇯🇵 **Japanese** → Romaji (Hepburn), powered by `cutlet` + `pykakasi` fallback
+  - 🇨🇳 **Chinese** → Pinyin with tone marks, powered by `pypinyin`
+  - 🇰🇷 **Korean** → Romaja (Revised Romanisation), powered by `korean-romanizer`
+- Toggle buttons only appear when the detected language supports translation — no clutter for English or other songs
+
 ### 🖥 GUI (Tkinter)
 - Clean dark theme
 - **Song info panel** — title and artist with wrap support for long names
+- **Translation bar** — shows detected language, current display mode (Original / Romaji / Pinyin / Romaja), and toggle buttons to switch between them
 - **Scrolling lyrics panel** — centred, auto-scrolling, no scrollbar
 - **Transport controls** — previous (◀◀), pause/resume (▌▌ / ▶), next (▶▶) buttons
 - **Progress bar** — live red fill with current and total time flanking the controls
@@ -89,36 +98,8 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 
 ## 📦 Installation
 
-### Option A — Pre-built Executable (recommended)
-
 1. Download `LyricsPlayer.exe` from the [Releases](https://github.com/your-username/AutoLyricsApp/releases) page
-2. Run it — no Python or dependencies required
-
----
-
-### Option B — Run from Source
-
-**1. Clone the repository**
-```bash
-git clone https://github.com/your-username/AutoLyricsApp.git
-cd AutoLyricsApp
-```
-
-**2. Install dependencies**
-```bash
-pip install syncedlyrics winsdk pyinstaller pykakasi unidic-lite
-```
-
-**3. Run directly**
-```bash
-python main.py
-```
-
-**4. Or build the exe yourself**
-```bash
-python build_exe.py
-```
-The compiled `LyricsPlayer.exe` will appear in the `dist/` folder. No Python installation is needed to run it on another machine.
+2. Run it — no Python or any dependencies required
 
 ---
 
@@ -127,8 +108,9 @@ The compiled `LyricsPlayer.exe` will appear in the `dist/` folder. No Python ins
 - **Windows only** — requires Windows 10 or 11
 - The media player must expose system media controls (Spotify, browsers, etc.)
 - Lyrics availability depends on the `syncedlyrics` library — some songs may have no or wrong LRC data
-- The auto-nudge causes a very brief (~40ms) stutter on first launch to force a position sync
-   - Sometimes it stops the music, you can manually resume or press the refresh button manually
+- The auto-nudge causes a very brief (~40ms) stutter on first launch to force a position sync — if the music stops, press play or use the ⟳ refresh button to re-sync manually
+- **Use YouTube Music instead of YouTube** — YouTube Music lyrics tend to sync more accurately with the app, likely because the `syncedlyrics` library has better LRC data for it. Standard YouTube may have off-sync or missing lyrics
+- **Multiple browser tabs** — the app reads media info from the Windows media session, which reports whichever source Windows considers active. If multiple tabs or apps are playing (or have recently played) audio, the app may pick up the wrong one — for example reading a video you are watching instead of the song you are listening to. For best results, keep only one media source active at a time
 
 ---
 
