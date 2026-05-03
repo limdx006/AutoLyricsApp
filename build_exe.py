@@ -26,13 +26,17 @@ PyInstaller.__main__.run([
     '--hidden-import', 'pykakasi',
     '--hidden-import', 'fugashi',
     '--hidden-import', 'unidic_lite',
-    
+
+    # Hidden imports - pinyin conversion
+    '--hidden-import', 'pypinyin',
+
     # Collect ALL package data for unidic-lite and its dependencies
     # This ensures the dictionary files are bundled
     '--collect-data', 'unidic_lite',
     '--collect-data', 'fugashi',
     '--collect-data', 'cutlet',
     '--collect-data', 'pykakasi',
+    '--collect-data', 'pypinyin',
     
     # Also collect binaries (compiled C extensions) for fugashi/mecab
     '--collect-binaries', 'fugashi',
@@ -43,4 +47,5 @@ PyInstaller.__main__.run([
     '--collect-submodules', 'fugashi',
     '--collect-submodules', 'cutlet',
     '--collect-submodules', 'pykakasi',
+    '--collect-submodules', 'pypinyin',
 ])

@@ -1,14 +1,15 @@
 import tkinter as tk
 
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, BG_COLOR, ACCENT_COLOR
-from lyrics_utils import format_display_time, COLOR_MAP
+from lyrics_utils import format_display_time, COLOR_MAP, to_romaji, to_pinyin
 
 
 class LyricsApp:
     def __init__(self, root):
         self.root = root
         self.lyric_offset = 0.3
-        self.lyric_mode = "original"  # Track current lyric mode
+        self.lyric_mode = "original"
+        self._detected_language = "other"  # Set after lyrics load: 'japanese', 'chinese', 'other'
         self._build_window()
         self._build_info_panel()
         self._build_lyrics_panel()
@@ -51,16 +52,11 @@ class LyricsApp:
             state="disabled",
         )
         self.settings_menu.add_separator()
-        
-        # Add lyric mode options
         self.settings_menu.add_command(
-            label="Japanese (Original)",
+            label="Original",
             command=lambda: self._on_lyric_mode_selected("original"),
         )
-        self.settings_menu.add_command(
-            label="Romaji (Roman Letters)",
-            command=lambda: self._on_lyric_mode_selected("romaji"),
-        )
+        # Translation options are added dynamically via set_detected_language()
 
         self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
         self._offset_var.trace_add("write", self._on_offset_var_changed)
@@ -321,6 +317,35 @@ class LyricsApp:
         if hasattr(self, "set_lyric_mode_callback") and self.set_lyric_mode_callback:
             self.set_lyric_mode_callback(mode)
 
+    def set_detected_language(self, language):
+        """Called after lyrics are loaded with the detected language.
+        Rebuilds the settings menu translation options to match the song language.
+        Only shows translation options relevant to the current song."""
+        self._detected_language = language
+        self.lyric_mode = "original"
+
+        # Remove all entries after the separator (index 2 onward) and rebuild
+        last = self.settings_menu.index(tk.END)
+        if last is not None:
+            for i in range(last, 1, -1):
+                self.settings_menu.delete(i)
+
+        self.settings_menu.add_command(
+            label="Original",
+            command=lambda: self._on_lyric_mode_selected("original"),
+        )
+
+        if language == "japanese":
+            self.settings_menu.add_command(
+                label="Romaji (Roman Letters)",
+                command=lambda: self._on_lyric_mode_selected("romaji"),
+            )
+        elif language == "chinese":
+            self.settings_menu.add_command(
+                label="Pinyin",
+                command=lambda: self._on_lyric_mode_selected("pinyin"),
+            )
+
     def _on_offset_var_changed(self, *args):
         if getattr(self, "_offset_update_lock", False):
             return
@@ -407,9 +432,17 @@ class LyricsApp:
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
 
         for timestamp, text in lyrics_data:
+            # Apply translation if mode is active and language matches
+            if self.lyric_mode == "romaji" and self._detected_language == "japanese":
+                display_text = to_romaji(text)
+            elif self.lyric_mode == "pinyin" and self._detected_language == "chinese":
+                display_text = to_pinyin(text)
+            else:
+                display_text = text
+
             label = tk.Label(
                 self.lyrics_frame,
-                text=text,
+                text=display_text,
                 font=("Helvetica", 13),
                 bg=BG_COLOR,
                 fg="#888888",

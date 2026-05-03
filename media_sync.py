@@ -7,7 +7,7 @@ from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
 
-from lyrics_utils import parse_lrc, get_current_lyric_index
+from lyrics_utils import parse_lrc, get_current_lyric_index, detect_language
 
 
 """MEDIA SYNC - All mutable playback state lives here as module-level globals.
@@ -267,6 +267,22 @@ def register_refresh_button(app, loop):
     app.set_refresh_callback(on_click)
 
 
+def register_lyric_mode_change(app, loop):
+    """Wire the GUI lyric mode selector so changing mode reloads the current lyrics."""
+    def on_mode_change(mode):
+        # Reload lyrics with the new mode — runs on the Tkinter thread via after()
+        if hasattr(app, "_current_lyrics_snapshot") and app._current_lyrics_snapshot:
+            app.root.after(
+                0,
+                lambda: app.load_lyrics(
+                    app._current_lyrics_snapshot,
+                    app._last_highlight_index,
+                ),
+            )
+
+    app.set_lyric_mode_callback = on_mode_change
+
+
 async def _refresh_sync_async(app, sleep_delay: float = 0.1):
     sessions = await MediaManager.request_async()
     session = sessions.get_current_session()
@@ -348,6 +364,9 @@ async def sync_song(app):
                 else:
                     lyrics_lines = []
 
+                # Detect language from the parsed lyrics
+                language = detect_language(lyrics_lines)
+
                 if should_initialise and lyrics_lines:
                     start_index = get_current_lyric_index(
                         lyrics_lines, system_pos + 0.3
@@ -356,6 +375,12 @@ async def sync_song(app):
                     start_index = -1
 
                 lyrics_snapshot = lyrics_lines.copy()
+                app._current_lyrics_snapshot = lyrics_snapshot
+
+                # Push detected language first so menu and mode are ready before load
+                app.root.after(
+                    0, lambda lang=language: app.set_detected_language(lang)
+                )
                 app.root.after(
                     0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
                 )

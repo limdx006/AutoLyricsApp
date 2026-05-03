@@ -1,4 +1,7 @@
 import re
+import cutlet as _cutlet
+import pykakasi as _pykakasi
+from pypinyin import lazy_pinyin as _lazy_pinyin, Style as _Style
 
 
 """LYRICS UTILS - Pure helper functions for parsing LRC lyrics, formatting timestamps,
@@ -11,6 +14,50 @@ COLOR_MAP = {
     "#aaaaaa": (170, 170, 170),  # nearby
     "#555555": (85, 85, 85),  # far
 }
+
+# Single shared instances — initialising these is expensive so do it once at import
+_cutlet_engine = _cutlet.Cutlet()
+_kakasi_engine = _pykakasi.kakasi()
+
+
+"""LANGUAGE DETECTION - Uses Unicode ranges to identify Japanese and Chinese text.
+Japanese is identified by the presence of hiragana or katakana, which are unique to
+Japanese. Chinese is identified by CJK characters without any kana."""
+
+
+def detect_language(lyrics_lines):
+    """Sample the first 10 lyric lines to detect the dominant language.
+    Returns 'japanese', 'chinese', or 'other'."""
+    sample = " ".join(text for _, text in lyrics_lines[:10])
+
+    # Hiragana (3040–309f) and katakana (30a0–30ff) are exclusive to Japanese
+    if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", sample):
+        return "japanese"
+
+    # CJK unified ideographs without any kana → Chinese
+    if re.search(r"[\u4e00-\u9fff]", sample):
+        return "chinese"
+
+    return "other"
+
+
+def to_romaji(text):
+    """Convert Japanese text to Hepburn romaji using cutlet (primary) with pykakasi as fallback."""
+    if not text:
+        return text
+    try:
+        return _cutlet_engine.romaji(text)
+    except Exception:
+        # pykakasi fallback if cutlet fails
+        result = _kakasi_engine.convert(text)
+        return " ".join(item["hepburn"] for item in result if item["hepburn"])
+
+
+def to_pinyin(text):
+    """Convert Chinese text to pinyin with tone marks."""
+    if not text:
+        return text
+    return " ".join(_lazy_pinyin(text, style=_Style.TONE))
 
 
 # Format seconds as an LRC timestamp string e.g. [02:34.50]
