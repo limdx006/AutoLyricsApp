@@ -1,5 +1,7 @@
 import re
-
+import cutlet as _cutlet
+import pykakasi as _pykakasi
+from pypinyin import lazy_pinyin as _lazy_pinyin, Style as _Style
 
 """LYRICS UTILS - Pure helper functions for parsing LRC lyrics, formatting timestamps,
 and finding which lyric line matches the current playback position.
@@ -11,6 +13,89 @@ COLOR_MAP = {
     "#aaaaaa": (170, 170, 170),  # nearby
     "#555555": (85, 85, 85),  # far
 }
+
+# Single shared instances — initialising these is expensive so do it once at import
+_cutlet_engine = _cutlet.Cutlet()
+_kakasi_engine = _pykakasi.kakasi()
+
+# Lazy-loaded Korean romanizer engine
+_korean_romanizer = None
+
+
+def _get_korean_romanizer():
+    """Lazy-load the Korean romanizer to avoid import overhead if not needed."""
+    global _korean_romanizer
+    if _korean_romanizer is not None:
+        return _korean_romanizer
+    try:
+        from korean_romanizer.romanizer import Romanizer
+
+        _korean_romanizer = Romanizer
+        return _korean_romanizer
+    except Exception as e:
+        print("korean-romanizer import failed:", e)
+        _korean_romanizer = None
+        return None
+
+
+"""LANGUAGE DETECTION - Uses Unicode ranges to identify Japanese, Chinese, and Korean text.
+Japanese is identified by the presence of hiragana or katakana, which are unique to
+Japanese. Chinese is identified by CJK characters without any kana. Korean is identified
+by Hangul syllables (AC00–D7AF) or Jamo (1100–11FF, 3130–318F)."""
+
+
+def detect_language(lyrics_lines):
+    """Sample the first 10 lyric lines to detect the dominant language.
+    Returns 'japanese', 'chinese', 'korean', or 'other'."""
+    sample = " ".join(text for _, text in lyrics_lines[:10])
+
+    # Hiragana (3040–309f) and katakana (30a0–30ff) are exclusive to Japanese
+    if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", sample):
+        return "japanese"
+
+    # Hangul syllables (AC00–D7AF) or Hangul Jamo (1100–11FF, 3130–318F) → Korean
+    if re.search(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]", sample):
+        return "korean"
+
+    # CJK unified ideographs without any kana → Chinese
+    if re.search(r"[\u4e00-\u9fff]", sample):
+        return "chinese"
+
+    return "other"
+
+
+def to_romaji(text):
+    """Convert Japanese text to Hepburn romaji using cutlet (primary) with pykakasi as fallback."""
+    if not text:
+        return text
+    try:
+        return _cutlet_engine.romaji(text)
+    except Exception:
+        # pykakasi fallback if cutlet fails
+        result = _kakasi_engine.convert(text)
+        return " ".join(item["hepburn"] for item in result if item["hepburn"])
+
+
+def to_pinyin(text):
+    """Convert Chinese text to pinyin with tone marks."""
+    if not text:
+        return text
+    return " ".join(_lazy_pinyin(text, style=_Style.TONE))
+
+
+def to_romanized_korean(text):
+    """Convert Korean Hangul text to Revised Romanization using korean-romanizer.
+    Falls back to original text if the library is unavailable."""
+    if not text:
+        return text
+    Romanizer = _get_korean_romanizer()
+    if not Romanizer:
+        return text
+    try:
+        r = Romanizer(text)
+        return r.romanize()
+    except Exception:
+        return text
 
 
 # Format seconds as an LRC timestamp string e.g. [02:34.50]
