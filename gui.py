@@ -838,16 +838,13 @@ class LyricsApp:
         )
 
     def highlight_lyric(self, index):
-        if not self.lyric_labels:
+        if not self.lyric_labels or index == self._last_highlight_index:
             return
 
         prev = self._last_highlight_index
-
-        if index == prev:
-            return
-
         self._last_highlight_index = index
 
+        # 1. Trigger font transitions
         affected = set()
         for idx in (prev - 1, prev, prev + 1, index - 1, index, index + 1):
             if 0 <= idx < len(self.lyric_labels):
@@ -861,8 +858,68 @@ class LyricsApp:
             else:
                 self._start_transition(i, "far", self.font_size_far, False)
 
-        # Calculate target scroll ratio and animate smoothly to it
+        # 2. Start the scroll animation targeting the INDEX specifically
+        self._start_scroll_to_index(index)
+
+    def _start_scroll_to_index(self, index):
+        """Cancels existing scroll and starts a new one targeting a specific label index."""
+        if self._scroll_job is not None:
+            self.root.after_cancel(self._scroll_job)
+        
+        # Determine current ratio to start from
+        start_ratio = self.lyrics_canvas.yview()[0]
+        self._animate_scroll_dynamic(index, start_ratio, step=1, total_steps=20)
+
+    def _animate_scroll_dynamic(self, target_idx, start_ratio, step, total_steps):
+        """Dynamically calculates the target ratio in each frame to handle layout shifts."""
+        # Ensure label positions are updated in the internal geometry engine
+        self.lyrics_frame.update_idletasks() 
+
+        _, label = self.lyric_labels[target_idx]
+        canvas_height = self.lyrics_canvas.winfo_height()
+        frame_height = self.lyrics_frame.winfo_height()
+        
+        # Recalculate target ratio every frame because frame_height is changing!
+        label_y = label.winfo_y()
+        label_height = label.winfo_height()
+        
+        target_pos = label_y - (canvas_height / 2) + (label_height / 2)
+        max_scroll = max(0, frame_height - canvas_height)
+        target_pos = max(0, min(target_pos, max_scroll))
+        
+        end_ratio = target_pos / frame_height if frame_height > 0 else 0
+
+        # Ease-in-out interpolation
+        t = step / total_steps
+        t_eased = t * t * (3 - 2 * t)
+        current_ratio = start_ratio + (end_ratio - start_ratio) * t_eased
+
+        self.lyrics_canvas.yview_moveto(current_ratio)
+        self._last_scroll_y = current_ratio
+
+        if step < total_steps:
+            self._scroll_job = self.root.after(
+                12, lambda: self._animate_scroll_dynamic(target_idx, start_ratio, step + 1, total_steps)
+            )
+        else:
+            self._scroll_job = None
+
+    def _recenter_active_lyric(self):
+        """Instantly jump to center, but ONLY if we aren't currently animating a smooth scroll."""
+        self._recenter_job = None
+        
+        # If a smooth scroll is running, let it handle the centering instead
+        if self._scroll_job is not None:
+            return
+
+        if not self.lyric_labels or self._last_highlight_index < 0:
+            return
+
+        self.lyrics_frame.update_idletasks() # Crucial for accurate winfo_y()
+        
+        index = min(self._last_highlight_index, len(self.lyric_labels) - 1)
         _, label = self.lyric_labels[index]
+
         canvas_height = self.lyrics_canvas.winfo_height()
         label_y = label.winfo_y()
         label_height = label.winfo_height()
@@ -874,4 +931,5 @@ class LyricsApp:
         frame_height = self.lyrics_frame.winfo_height()
         scroll_ratio = scroll_pos / frame_height if frame_height > 0 else 0
 
-        self._start_scroll(scroll_ratio)
+        self._last_scroll_y = scroll_ratio
+        self.lyrics_canvas.yview_moveto(scroll_ratio)
