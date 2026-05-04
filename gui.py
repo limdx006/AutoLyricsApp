@@ -8,6 +8,7 @@ from lyrics_utils import (
     to_pinyin,
     to_romanized_korean,
 )
+from settings_window import SettingsWindow
 
 
 class LyricsApp:
@@ -35,6 +36,11 @@ class LyricsApp:
             "nearby": COLOR_MAP["#aaaaaa"],
             "far": COLOR_MAP["#555555"],
         }
+
+        # Default font sizes (match the "Default" preset in settings)
+        self.font_size_active = 16
+        self.font_size_nearby = 13
+        self.font_size_far = 12
 
         self.lyrics_frame.bind("<Configure>", self._on_frame_configure)
         self.lyrics_canvas.bind("<Configure>", self._on_canvas_configure)
@@ -406,10 +412,7 @@ class LyricsApp:
             self._refresh_callback()
 
     def _on_settings_btn_clicked(self, event=None):
-        self.settings_menu.tk_popup(
-            self.settings_btn.winfo_rootx(),
-            self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height(),
-        )
+        SettingsWindow(self.root, self)
 
     def _on_lyric_mode_selected(self, mode):
         """Handle lyric mode selection from the settings menu or translation bar."""
@@ -547,7 +550,7 @@ class LyricsApp:
             label = tk.Label(
                 self.lyrics_frame,
                 text=display_text,
-                font=("Helvetica", 13),
+                font=("Helvetica", self.font_size_far),
                 bg=BG_COLOR,
                 fg="#888888",
                 wraplength=WINDOW_WIDTH - 60,
@@ -578,11 +581,11 @@ class LyricsApp:
             for i in range(len(self.lyric_labels)):
                 _, label = self.lyric_labels[i]
                 if i == initial_index:
-                    label.config(fg="#ffffff", font=("Helvetica", 15, "bold"))
+                    label.config(fg="#ffffff", font=("Helvetica", self.font_size_active, "bold"))
                 elif i == initial_index - 1 or i == initial_index + 1:
-                    label.config(fg="#aaaaaa", font=("Helvetica", 13))
+                    label.config(fg="#aaaaaa", font=("Helvetica", self.font_size_nearby))
                 else:
-                    label.config(fg="#555555", font=("Helvetica", 12))
+                    label.config(fg="#555555", font=("Helvetica", self.font_size_far))
 
             self._last_highlight_index = initial_index
 
@@ -738,11 +741,11 @@ class LyricsApp:
 
         for i in affected:
             if i == index:
-                self._start_transition(i, "active", 15, True)
+                self._start_transition(i, "active", self.font_size_active, True)
             elif i == index - 1 or i == index + 1:
-                self._start_transition(i, "nearby", 13, False)
+                self._start_transition(i, "nearby", self.font_size_nearby, False)
             else:
-                self._start_transition(i, "far", 12, False)
+                self._start_transition(i, "far", self.font_size_far, False)
 
         # Calculate target scroll ratio and animate smoothly to it
         _, label = self.lyric_labels[index]
