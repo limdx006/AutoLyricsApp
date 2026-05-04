@@ -315,7 +315,7 @@ class SettingsWindow:
         self._app.root.geometry(f"{width}x{height}")
         self._app.main_frame.config(width=width, height=height)
         self._app.lyrics_canvas.itemconfig(
-            self._app.lyrics_canvas_window, width=width - 40
+            self._app.lyrics_canvas_window, width=width - 20
         )
         self._app.lyrics_frame.update_idletasks()
         self._app._on_frame_configure()

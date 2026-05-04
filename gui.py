@@ -254,8 +254,9 @@ class LyricsApp:
         self.mode_value_label.config(text=mode_names.get(self.lyric_mode, "Original"))
 
     def _build_lyrics_panel(self):
+        # Reduced side padding so lyrics take more horizontal space
         self.lyrics_container = tk.Frame(self.main_frame, bg=BG_COLOR)
-        self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.lyrics_container.pack(fill=tk.BOTH, expand=True, padx=4, pady=10)
 
         self.lyrics_canvas = tk.Canvas(
             self.lyrics_container, bg=BG_COLOR, highlightthickness=0
@@ -263,8 +264,9 @@ class LyricsApp:
         self.lyrics_canvas.pack(fill=tk.BOTH, expand=True)
 
         self.lyrics_frame = tk.Frame(self.lyrics_canvas, bg=BG_COLOR)
+        # The width given to the inner frame now leaves only a 4px margin on each side
         self.lyrics_canvas_window = self.lyrics_canvas.create_window(
-            (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 40
+            (0, 0), window=self.lyrics_frame, anchor=tk.NW, width=WINDOW_WIDTH - 8
         )
 
     def _build_progress_bar(self):
@@ -536,6 +538,12 @@ class LyricsApp:
         # Top spacer
         tk.Frame(self.lyrics_frame, bg=BG_COLOR, height=250).pack(fill=tk.X)
 
+        # Dynamic wraplength based on current canvas width
+        canvas_width = self.lyrics_canvas.winfo_width()
+        if canvas_width < 50:  # canvas not yet mapped
+            canvas_width = WINDOW_WIDTH
+        wrap_width = max(100, canvas_width - 12)  # 12px total horizontal margin
+
         for timestamp, text in lyrics_data:
             # Apply translation if mode is active and language matches
             if self.lyric_mode == "romaji" and self._detected_language == "japanese":
@@ -553,7 +561,7 @@ class LyricsApp:
                 font=("Helvetica", self.font_size_far),
                 bg=BG_COLOR,
                 fg="#888888",
-                wraplength=WINDOW_WIDTH - 60,
+                wraplength=wrap_width,  # dynamic width
                 justify=tk.CENTER,
                 pady=12,
             )
@@ -571,6 +579,19 @@ class LyricsApp:
             lambda: self._apply_initial_position(initial_index)
         )
 
+    def _update_wraplengths(self):
+        """Update wraplength of all existing lyric labels to match current canvas width."""
+        canvas_width = self.lyrics_canvas.winfo_width()
+        if canvas_width < 50:
+            return
+        wrap_width = max(100, canvas_width - 12)
+        for _, label in self.lyric_labels:
+            label.config(wraplength=wrap_width)
+
+    def _on_canvas_configure(self, event):
+        self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
+        self._update_wraplengths()  # re-wrap lyrics when canvas width changes
+
     def _apply_initial_position(self, initial_index):
         """After lyrics load, jump to the correct position without animation.
         If initial_index is valid (mid-song resume), scroll to that lyric instantly
@@ -581,9 +602,13 @@ class LyricsApp:
             for i in range(len(self.lyric_labels)):
                 _, label = self.lyric_labels[i]
                 if i == initial_index:
-                    label.config(fg="#ffffff", font=("Helvetica", self.font_size_active, "bold"))
+                    label.config(
+                        fg="#ffffff", font=("Helvetica", self.font_size_active, "bold")
+                    )
                 elif i == initial_index - 1 or i == initial_index + 1:
-                    label.config(fg="#aaaaaa", font=("Helvetica", self.font_size_nearby))
+                    label.config(
+                        fg="#aaaaaa", font=("Helvetica", self.font_size_nearby)
+                    )
                 else:
                     label.config(fg="#555555", font=("Helvetica", self.font_size_far))
 
