@@ -1,9 +1,10 @@
 # Planned
-- [ ] Translation (Japanese to Roma/Chinese to Pinyin)
-- [ ] Editable font size and window size
+
 
 # Completed
 - [x] Auto sync using pause and play feature
 - [x] Pause and play button
 - [x] Next and previous button
 - [x] Manual sync timing (remember song that needed manual modification)
+- [x] Translation (Japanese to Roma/Chinese to Pinyin)
+- [x] Editable font size and window size
