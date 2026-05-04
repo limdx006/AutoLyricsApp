@@ -43,24 +43,19 @@ Japanese is identified by the presence of hiragana or katakana, which are unique
 Japanese. Chinese is identified by CJK characters without any kana. Korean is identified
 by Hangul syllables (AC00–D7AF) or Jamo (1100–11FF, 3130–318F)."""
 
+LRC_PATTERN = re.compile(r"\[(\d{2}):(\d{2}\.\d{2,3})\](.*)")
+JAPANESE_PATTERN = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+KOREAN_PATTERN = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
+CHINESE_PATTERN = re.compile(r"[\u4e00-\u9fff]")
+
 
 def detect_language(lyrics_lines):
-    """Sample the first 10 lyric lines to detect the dominant language.
-    Returns 'japanese', 'chinese', 'korean', or 'other'."""
+    """Cleaned language detection using pre-compiled patterns."""
     sample = " ".join(text for _, text in lyrics_lines[:10])
 
-    # Hiragana (3040–309f) and katakana (30a0–30ff) are exclusive to Japanese
-    if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", sample):
-        return "japanese"
-
-    # Hangul syllables (AC00–D7AF) or Hangul Jamo (1100–11FF, 3130–318F) → Korean
-    if re.search(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]", sample):
-        return "korean"
-
-    # CJK unified ideographs without any kana → Chinese
-    if re.search(r"[\u4e00-\u9fff]", sample):
-        return "chinese"
-
+    if JAPANESE_PATTERN.search(sample): return "japanese"
+    if KOREAN_PATTERN.search(sample):   return "korean"
+    if CHINESE_PATTERN.search(sample):  return "chinese"
     return "other"
 
 
@@ -115,18 +110,14 @@ def format_display_time(seconds):
 # Parse raw LRC text into a sorted list of (timestamp_seconds, text) tuples
 def parse_lrc(lrc_text):
     lines = []
-    pattern = r"\[(\d{2}):(\d{2}\.\d{2,3})\](.*)"
     for line in lrc_text.strip().split("\n"):
-        match = re.match(pattern, line.strip())
+        match = LRC_PATTERN.match(line.strip())
         if match:
-            minutes = int(match.group(1))
-            sec_ms = float(match.group(2))
-            timestamp = minutes * 60 + sec_ms
+            timestamp = int(match.group(1)) * 60 + float(match.group(2))
             text = match.group(3).strip()
-            if text:
-                lines.append((timestamp, text))
-    lines.sort(key=lambda x: x[0])
-    return lines
+            if text: lines.append((timestamp, text))
+    
+    return sorted(lines, key=lambda x: x[0])
 
 
 # Return the index of the lyric line that should be active at the given position
