@@ -15,6 +15,7 @@ from settings_window import SettingsWindow
 class LyricsApp:
     def __init__(self, root):
         self.root = root
+        self._font_cache = {}
         self.lyric_offset = 0.3
         self.lyric_mode = "original"
         self._detected_language = (
@@ -46,6 +47,16 @@ class LyricsApp:
 
         self.lyrics_frame.bind("<Configure>", self._on_frame_configure)
         self.lyrics_canvas.bind("<Configure>", self._on_canvas_configure)
+
+    def _get_cached_font(self, size, bold=False):
+        """Returns a cached font object to avoid expensive recreation."""
+        key = (size, bold)
+        if key not in self._font_cache:
+            weight = "bold" if bold else "normal"
+            self._font_cache[key] = tkfont.Font(
+                family="Helvetica", size=size, weight=weight
+            )
+        return self._font_cache[key]
 
     def _build_window(self):
         self.root.title("Lyrics Player")
@@ -360,16 +371,16 @@ class LyricsApp:
         )
 
     def _schedule_recenter(self):
-            """Debounces the recenter calculation so it doesn't lag while resizing the window."""
-            if getattr(self, '_recenter_job', None) is not None:
-                self.root.after_cancel(self._recenter_job)
-            # Wait 100ms after the resize/font change finishes before snapping to center
-            self._recenter_job = self.root.after(100, self._recenter_active_lyric)
+        """Debounces the recenter calculation so it doesn't lag while resizing the window."""
+        if getattr(self, "_recenter_job", None) is not None:
+            self.root.after_cancel(self._recenter_job)
+        # Wait 100ms after the resize/font change finishes before snapping to center
+        self._recenter_job = self.root.after(100, self._recenter_active_lyric)
 
     def _recenter_active_lyric(self):
         """Instantly calculate and jump to the center of the active lyric."""
         self._recenter_job = None
-        
+
         # Don't do anything if there's no active lyric yet
         if not self.lyric_labels or self._last_highlight_index < 0:
             return
@@ -405,42 +416,26 @@ class LyricsApp:
         if not text:
             return text
 
-        # Measure using the largest possible font state
-        measure_font = tkfont.Font(
-            family="Helvetica", size=self.font_size_active, weight="bold"
-        )
-
+        measure_font = self._get_cached_font(self.font_size_active, bold=True)
         if measure_font.measure(text) <= base_wrap_width:
             return text
 
-        lines = []
-        # Support both space-separated languages and continuous CJK
-        if " " in text:
-            words = text.split(" ")
-            current_line = ""
-            for word in words:
-                test_line = current_line + (" " if current_line else "") + word
-                if measure_font.measure(test_line) <= base_wrap_width:
-                    current_line = test_line
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = word
-            if current_line:
-                lines.append(current_line)
-        else:
-            # For languages without spaces
-            current_line = ""
-            for char in text:
-                if measure_font.measure(current_line + char) <= base_wrap_width:
-                    current_line += char
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = char
-            if current_line:
-                lines.append(current_line)
+        lines, current_line = [], ""
+        # Process by words if spaces exist, otherwise by character
+        items = text.split(" ") if " " in text else text
+        delimiter = " " if " " in text else ""
 
+        for item in items:
+            test_line = current_line + (delimiter if current_line else "") + item
+            if measure_font.measure(test_line) <= base_wrap_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = item
+
+        if current_line:
+            lines.append(current_line)
         return "\n".join(lines)
 
     def _on_frame_configure(self, event=None):
@@ -597,8 +592,8 @@ class LyricsApp:
         if self._scroll_job is not None:
             self.root.after_cancel(self._scroll_job)
             self._scroll_job = None
-        
-        if getattr(self, '_recenter_job', None) is not None:
+
+        if getattr(self, "_recenter_job", None) is not None:
             self.root.after_cancel(self._recenter_job)
             self._recenter_job = None
 
@@ -657,13 +652,13 @@ class LyricsApp:
                 justify=tk.CENTER,
                 pady=12,
             )
-            
+
             # Store the original text so we can re-wrap it if the window resizes
             label.original_text = display_text
-            
+
             # Apply the hard-wrapped text immediately
             label.config(text=self._apply_hard_wrapping(display_text, base_wrap_width))
-            
+
             label.pack(fill=tk.X)
             self.lyric_labels.append((timestamp, label))
 
@@ -687,8 +682,10 @@ class LyricsApp:
         base_wrap_width = max(100, canvas_width - 12)
 
         for _, label in self.lyric_labels:
-            if hasattr(label, 'original_text'):
-                hard_wrapped_text = self._apply_hard_wrapping(label.original_text, base_wrap_width)
+            if hasattr(label, "original_text"):
+                hard_wrapped_text = self._apply_hard_wrapping(
+                    label.original_text, base_wrap_width
+                )
                 label.config(text=hard_wrapped_text, wraplength=0)
 
     def _on_canvas_configure(self, event):
@@ -704,12 +701,16 @@ class LyricsApp:
             for i in range(len(self.lyric_labels)):
                 _, label = self.lyric_labels[i]
                 if i == initial_index:
-                    label.config(fg="#ffffff", font=("Helvetica", self.font_size_active, "bold"))
+                    label.config(
+                        fg="#ffffff", font=("Helvetica", self.font_size_active, "bold")
+                    )
                 elif i == initial_index - 1 or i == initial_index + 1:
-                    label.config(fg="#aaaaaa", font=("Helvetica", self.font_size_nearby))
+                    label.config(
+                        fg="#aaaaaa", font=("Helvetica", self.font_size_nearby)
+                    )
                 else:
                     label.config(fg="#555555", font=("Helvetica", self.font_size_far))
-                    
+
             self._last_highlight_index = initial_index
 
             # Scroll directly to the active lyric
@@ -770,7 +771,17 @@ class LyricsApp:
         # 20 steps × 12ms ≈ 240ms smooth scroll
         self._animate_scroll(start_ratio, target_ratio, step=1, total_steps=20)
 
-    def _animate_label(self, label_idx, start_rgb, end_rgb, start_size, end_size, bold, step, total_steps):
+    def _animate_label(
+        self,
+        label_idx,
+        start_rgb,
+        end_rgb,
+        start_size,
+        end_size,
+        bold,
+        step,
+        total_steps,
+    ):
         if label_idx >= len(self.lyric_labels):
             return
 
@@ -816,7 +827,6 @@ class LyricsApp:
             return
 
         _, label = self.lyric_labels[label_idx]
-
         current_font = label.cget("font")
         if isinstance(current_font, tuple):
             start_size = current_font[1]
@@ -827,6 +837,9 @@ class LyricsApp:
         current_color = label.cget("fg")
         start_rgb = COLOR_MAP.get(current_color, COLOR_MAP["#555555"])
         end_rgb = self._colors[end_color_name]
+
+        if COLOR_MAP.get(current_color) == end_rgb:
+            return
 
         if label_idx in self._anim_jobs:
             self.root.after_cancel(self._anim_jobs[label_idx])
@@ -865,7 +878,7 @@ class LyricsApp:
         """Cancels existing scroll and starts a new one targeting a specific label index."""
         if self._scroll_job is not None:
             self.root.after_cancel(self._scroll_job)
-        
+
         # Determine current ratio to start from
         start_ratio = self.lyrics_canvas.yview()[0]
         self._animate_scroll_dynamic(index, start_ratio, step=1, total_steps=20)
@@ -873,20 +886,20 @@ class LyricsApp:
     def _animate_scroll_dynamic(self, target_idx, start_ratio, step, total_steps):
         """Dynamically calculates the target ratio in each frame to handle layout shifts."""
         # Ensure label positions are updated in the internal geometry engine
-        self.lyrics_frame.update_idletasks() 
+        self.lyrics_frame.update_idletasks()
 
         _, label = self.lyric_labels[target_idx]
         canvas_height = self.lyrics_canvas.winfo_height()
         frame_height = self.lyrics_frame.winfo_height()
-        
+
         # Recalculate target ratio every frame because frame_height is changing!
         label_y = label.winfo_y()
         label_height = label.winfo_height()
-        
+
         target_pos = label_y - (canvas_height / 2) + (label_height / 2)
         max_scroll = max(0, frame_height - canvas_height)
         target_pos = max(0, min(target_pos, max_scroll))
-        
+
         end_ratio = target_pos / frame_height if frame_height > 0 else 0
 
         # Ease-in-out interpolation
@@ -899,7 +912,10 @@ class LyricsApp:
 
         if step < total_steps:
             self._scroll_job = self.root.after(
-                12, lambda: self._animate_scroll_dynamic(target_idx, start_ratio, step + 1, total_steps)
+                12,
+                lambda: self._animate_scroll_dynamic(
+                    target_idx, start_ratio, step + 1, total_steps
+                ),
             )
         else:
             self._scroll_job = None
@@ -907,7 +923,7 @@ class LyricsApp:
     def _recenter_active_lyric(self):
         """Instantly jump to center, but ONLY if we aren't currently animating a smooth scroll."""
         self._recenter_job = None
-        
+
         # If a smooth scroll is running, let it handle the centering instead
         if self._scroll_job is not None:
             return
@@ -915,8 +931,8 @@ class LyricsApp:
         if not self.lyric_labels or self._last_highlight_index < 0:
             return
 
-        self.lyrics_frame.update_idletasks() # Crucial for accurate winfo_y()
-        
+        self.lyrics_frame.update_idletasks()  # Crucial for accurate winfo_y()
+
         index = min(self._last_highlight_index, len(self.lyric_labels) - 1)
         _, label = self.lyric_labels[index]
 
