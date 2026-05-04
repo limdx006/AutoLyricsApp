@@ -31,6 +31,7 @@ class LyricsApp:
         self._anim_jobs = {}
         self._last_scroll_y = -1
         self._scroll_job = None  # Pending after() id for the scroll animation
+        self._recenter_job = None  # Tracks resize recentering
 
         self._colors = {
             "active": COLOR_MAP["#ffffff"],
@@ -358,6 +359,46 @@ class LyricsApp:
             0, 0, 0, 6, fill="#e94560", outline=""
         )
 
+    def _schedule_recenter(self):
+            """Debounces the recenter calculation so it doesn't lag while resizing the window."""
+            if getattr(self, '_recenter_job', None) is not None:
+                self.root.after_cancel(self._recenter_job)
+            # Wait 100ms after the resize/font change finishes before snapping to center
+            self._recenter_job = self.root.after(100, self._recenter_active_lyric)
+
+    def _recenter_active_lyric(self):
+        """Instantly calculate and jump to the center of the active lyric."""
+        self._recenter_job = None
+        
+        # Don't do anything if there's no active lyric yet
+        if not self.lyric_labels or self._last_highlight_index < 0:
+            return
+
+        # Cancel any running smooth-scroll animations so they don't fight us
+        if self._scroll_job is not None:
+            self.root.after_cancel(self._scroll_job)
+            self._scroll_job = None
+
+        # Get the currently highlighted label
+        index = min(self._last_highlight_index, len(self.lyric_labels) - 1)
+        _, label = self.lyric_labels[index]
+
+        # Calculate exact center
+        canvas_height = self.lyrics_canvas.winfo_height()
+        label_y = label.winfo_y()
+        label_height = label.winfo_height()
+
+        scroll_pos = label_y - (canvas_height / 2) + (label_height / 2)
+        max_scroll = max(0, self.lyrics_frame.winfo_height() - canvas_height)
+        scroll_pos = max(0, min(scroll_pos, max_scroll))
+
+        frame_height = self.lyrics_frame.winfo_height()
+        scroll_ratio = scroll_pos / frame_height if frame_height > 0 else 0
+
+        # Apply the scroll position instantly
+        self._last_scroll_y = scroll_ratio
+        self.lyrics_canvas.yview_moveto(scroll_ratio)
+
     def _apply_hard_wrapping(self, text, base_wrap_width):
         """Calculates exact line breaks using the active (largest) font size.
         This ensures text lines remain perfectly fixed during animations."""
@@ -404,9 +445,12 @@ class LyricsApp:
 
     def _on_frame_configure(self, event=None):
         self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
+        self._schedule_recenter()  # Trigger recenter when frame height changes
 
     def _on_canvas_configure(self, event):
         self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
+        self._update_wraplengths()  # re-wrap lyrics when canvas width changes
+        self._schedule_recenter()  # Trigger recenter when window resizes
 
     def update_song_info(self, title, artist, duration):
         self.title_label.config(text=title or "Unknown Title")
@@ -553,6 +597,10 @@ class LyricsApp:
         if self._scroll_job is not None:
             self.root.after_cancel(self._scroll_job)
             self._scroll_job = None
+        
+        if getattr(self, '_recenter_job', None) is not None:
+            self.root.after_cancel(self._recenter_job)
+            self._recenter_job = None
 
         for widget in self.lyrics_frame.winfo_children():
             widget.destroy()
