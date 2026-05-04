@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import font as tkfont
 
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, BG_COLOR, ACCENT_COLOR
 from lyrics_utils import (
@@ -357,6 +358,50 @@ class LyricsApp:
             0, 0, 0, 6, fill="#e94560", outline=""
         )
 
+    def _apply_hard_wrapping(self, text, base_wrap_width):
+        """Calculates exact line breaks using the active (largest) font size.
+        This ensures text lines remain perfectly fixed during animations."""
+        if not text:
+            return text
+
+        # Measure using the largest possible font state
+        measure_font = tkfont.Font(
+            family="Helvetica", size=self.font_size_active, weight="bold"
+        )
+
+        if measure_font.measure(text) <= base_wrap_width:
+            return text
+
+        lines = []
+        # Support both space-separated languages and continuous CJK
+        if " " in text:
+            words = text.split(" ")
+            current_line = ""
+            for word in words:
+                test_line = current_line + (" " if current_line else "") + word
+                if measure_font.measure(test_line) <= base_wrap_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+            if current_line:
+                lines.append(current_line)
+        else:
+            # For languages without spaces
+            current_line = ""
+            for char in text:
+                if measure_font.measure(current_line + char) <= base_wrap_width:
+                    current_line += char
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = char
+            if current_line:
+                lines.append(current_line)
+
+        return "\n".join(lines)
+
     def _on_frame_configure(self, event=None):
         self.lyrics_canvas.configure(scrollregion=self.lyrics_canvas.bbox("all"))
 
@@ -540,9 +585,9 @@ class LyricsApp:
 
         # Dynamic wraplength based on current canvas width
         canvas_width = self.lyrics_canvas.winfo_width()
-        if canvas_width < 50:  # canvas not yet mapped
+        if canvas_width < 50:
             canvas_width = WINDOW_WIDTH
-        wrap_width = max(100, canvas_width - 12)  # 12px total horizontal margin
+        base_wrap_width = max(100, canvas_width - 12)  # 12px total horizontal margin
 
         for timestamp, text in lyrics_data:
             # Apply translation if mode is active and language matches
@@ -557,14 +602,20 @@ class LyricsApp:
 
             label = tk.Label(
                 self.lyrics_frame,
-                text=display_text,
                 font=("Helvetica", self.font_size_far),
                 bg=BG_COLOR,
                 fg="#888888",
-                wraplength=wrap_width,  # dynamic width
+                wraplength=0,  # DISABLE native wrapping
                 justify=tk.CENTER,
                 pady=12,
             )
+            
+            # Store the original text so we can re-wrap it if the window resizes
+            label.original_text = display_text
+            
+            # Apply the hard-wrapped text immediately
+            label.config(text=self._apply_hard_wrapping(display_text, base_wrap_width))
+            
             label.pack(fill=tk.X)
             self.lyric_labels.append((timestamp, label))
 
@@ -584,9 +635,13 @@ class LyricsApp:
         canvas_width = self.lyrics_canvas.winfo_width()
         if canvas_width < 50:
             return
-        wrap_width = max(100, canvas_width - 12)
+
+        base_wrap_width = max(100, canvas_width - 12)
+
         for _, label in self.lyric_labels:
-            label.config(wraplength=wrap_width)
+            if hasattr(label, 'original_text'):
+                hard_wrapped_text = self._apply_hard_wrapping(label.original_text, base_wrap_width)
+                label.config(text=hard_wrapped_text, wraplength=0)
 
     def _on_canvas_configure(self, event):
         self.lyrics_canvas.itemconfig(self.lyrics_canvas_window, width=event.width)
@@ -598,20 +653,15 @@ class LyricsApp:
         and style it as active so the user sees the right line immediately.
         If initial_index is -1 (new song from the start), just reset to top."""
         if initial_index > 0 and initial_index < len(self.lyric_labels):
-            # Style the active line and its neighbours directly, no animation
             for i in range(len(self.lyric_labels)):
                 _, label = self.lyric_labels[i]
                 if i == initial_index:
-                    label.config(
-                        fg="#ffffff", font=("Helvetica", self.font_size_active, "bold")
-                    )
+                    label.config(fg="#ffffff", font=("Helvetica", self.font_size_active, "bold"))
                 elif i == initial_index - 1 or i == initial_index + 1:
-                    label.config(
-                        fg="#aaaaaa", font=("Helvetica", self.font_size_nearby)
-                    )
+                    label.config(fg="#aaaaaa", font=("Helvetica", self.font_size_nearby))
                 else:
                     label.config(fg="#555555", font=("Helvetica", self.font_size_far))
-
+                    
             self._last_highlight_index = initial_index
 
             # Scroll directly to the active lyric
@@ -672,17 +722,7 @@ class LyricsApp:
         # 20 steps × 12ms ≈ 240ms smooth scroll
         self._animate_scroll(start_ratio, target_ratio, step=1, total_steps=20)
 
-    def _animate_label(
-        self,
-        label_idx,
-        start_rgb,
-        end_rgb,
-        start_size,
-        end_size,
-        bold,
-        step,
-        total_steps,
-    ):
+    def _animate_label(self, label_idx, start_rgb, end_rgb, start_size, end_size, bold, step, total_steps):
         if label_idx >= len(self.lyric_labels):
             return
 
@@ -699,6 +739,7 @@ class LyricsApp:
         size = round(start_size + (end_size - start_size) * t_eased)
         font_spec = ("Helvetica", size, "bold") if bold else ("Helvetica", size)
 
+        # Apply only color and font. Wrapping is already hardcoded!
         _, label = self.lyric_labels[label_idx]
         label.config(fg=color, font=font_spec)
 

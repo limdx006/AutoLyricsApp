@@ -1,7 +1,6 @@
 import tkinter as tk
 import config
 
-
 """SETTINGS WINDOW - A modal preference window that lets the user change the window
 size and lyric font size using preset values. Changes apply immediately so the user
 can see the effect without closing the window. Calls back into the GUI via the
@@ -9,18 +8,18 @@ apply_callback so it never imports from gui.py directly."""
 
 # Preset options — (display label, value)
 WINDOW_SIZE_PRESETS = [
-    ("Small  — 360 × 640",   (360,  640)),
-    ("Medium — 400 × 700",   (400,  700)),
-    ("Default — 400 × 800",  (400,  800)),
-    ("Large  — 440 × 900",   (440,  900)),
-    ("Wide   — 500 × 800",   (500,  800)),
+    ("Small  — 360 × 640", (360, 640)),
+    ("Medium — 400 × 700", (400, 700)),
+    ("Default — 400 × 800", (400, 800)),
+    ("Large  — 440 × 900", (440, 900)),
+    ("Wide   — 500 × 800", (500, 800)),
 ]
 
 FONT_SIZE_PRESETS = [
-    ("Small  — 14 / 12 / 11",  {"active": 14, "nearby": 12, "far": 11}),
+    ("Small  — 14 / 12 / 11", {"active": 14, "nearby": 12, "far": 11}),
     ("Default — 16 / 13 / 12", {"active": 16, "nearby": 13, "far": 12}),
-    ("Large  — 18 / 14 / 13",  {"active": 18, "nearby": 14, "far": 13}),
-    ("XLarge — 20 / 16 / 14",  {"active": 20, "nearby": 16, "far": 14}),
+    ("Large  — 18 / 14 / 13", {"active": 18, "nearby": 14, "far": 13}),
+    ("XLarge — 20 / 16 / 14", {"active": 20, "nearby": 16, "far": 14}),
 ]
 
 
@@ -37,14 +36,19 @@ class SettingsWindow:
         self._win.configure(bg=config.BG_COLOR)
         self._win.resizable(False, False)
         self._win.transient(parent)  # Attach to main window
-        self._win.grab_set()         # Block interaction with main window while open
+        self._win.grab_set()  # Block interaction with main window while open
 
         self._build_ui()
 
         # Centre the settings window over the main window
         self._win.update_idletasks()
-        px = parent.winfo_rootx() + (parent.winfo_width() - self._win.winfo_width()) // 2
-        py = parent.winfo_rooty() + (parent.winfo_height() - self._win.winfo_height()) // 2
+        px = (
+            parent.winfo_rootx() + (parent.winfo_width() - self._win.winfo_width()) // 2
+        )
+        py = (
+            parent.winfo_rooty()
+            + (parent.winfo_height() - self._win.winfo_height()) // 2
+        )
         self._win.geometry(f"+{px}+{py}")
 
     def _build_ui(self):
@@ -59,7 +63,9 @@ class SettingsWindow:
             fg="#ffffff",
         ).pack(pady=(18, 4))
 
-        tk.Frame(self._win, bg="#333355", height=1).pack(fill=tk.X, padx=20, pady=(0, 10))
+        tk.Frame(self._win, bg="#333355", height=1).pack(
+            fill=tk.X, padx=20, pady=(0, 10)
+        )
 
         # Window size section
         self._build_section_label("Window Size")
@@ -126,8 +132,11 @@ class SettingsWindow:
         ).pack(side=tk.LEFT, padx=(4, 2))
 
         tk.Label(
-            custom_size_row, text="×",
-            font=("Helvetica", 10), bg=config.BG_COLOR, fg="#cccccc",
+            custom_size_row,
+            text="×",
+            font=("Helvetica", 10),
+            bg=config.BG_COLOR,
+            fg="#cccccc",
         ).pack(side=tk.LEFT)
 
         tk.Entry(
@@ -150,7 +159,8 @@ class SettingsWindow:
             activebackground="#e94560",
             activeforeground="#ffffff",
             relief=tk.FLAT,
-            padx=6, pady=1,
+            padx=6,
+            pady=1,
             cursor="hand2",
             command=self._apply_custom_size,
         ).pack(side=tk.LEFT)
@@ -163,7 +173,9 @@ class SettingsWindow:
             fg="#555577",
         ).pack(anchor=tk.W, pady=(0, 2))
 
-        tk.Frame(self._win, bg="#333355", height=1).pack(fill=tk.X, padx=20, pady=(8, 2))
+        tk.Frame(self._win, bg="#333355", height=1).pack(
+            fill=tk.X, padx=20, pady=(8, 2)
+        )
 
         # Font size section
         self._build_section_label("Lyric Font Size")
@@ -212,11 +224,21 @@ class SettingsWindow:
             command=self._on_font_changed,
         ).pack(side=tk.LEFT)
 
-        self._custom_font_active_var  = tk.StringVar(value=str(getattr(self._app, "font_size_active", 16)))
-        self._custom_font_nearby_var  = tk.StringVar(value=str(getattr(self._app, "font_size_nearby", 13)))
-        self._custom_font_far_var     = tk.StringVar(value=str(getattr(self._app, "font_size_far",    12)))
+        self._custom_font_active_var = tk.StringVar(
+            value=str(getattr(self._app, "font_size_active", 16))
+        )
+        self._custom_font_nearby_var = tk.StringVar(
+            value=str(getattr(self._app, "font_size_nearby", 13))
+        )
+        self._custom_font_far_var = tk.StringVar(
+            value=str(getattr(self._app, "font_size_far", 12))
+        )
 
-        for var in (self._custom_font_active_var, self._custom_font_nearby_var, self._custom_font_far_var):
+        for var in (
+            self._custom_font_active_var,
+            self._custom_font_nearby_var,
+            self._custom_font_far_var,
+        ):
             tk.Entry(
                 custom_font_row,
                 textvariable=var,
@@ -237,7 +259,8 @@ class SettingsWindow:
             activebackground="#e94560",
             activeforeground="#ffffff",
             relief=tk.FLAT,
-            padx=6, pady=1,
+            padx=6,
+            pady=1,
             cursor="hand2",
             command=self._apply_custom_font,
         ).pack(side=tk.LEFT, padx=(6, 0))
@@ -250,7 +273,9 @@ class SettingsWindow:
             fg="#555577",
         ).pack(anchor=tk.W, pady=(0, 2))
 
-        tk.Frame(self._win, bg="#333355", height=1).pack(fill=tk.X, padx=20, pady=(10, 6))
+        tk.Frame(self._win, bg="#333355", height=1).pack(
+            fill=tk.X, padx=20, pady=(10, 6)
+        )
 
         # Footer
         tk.Label(
@@ -296,7 +321,7 @@ class SettingsWindow:
     def _apply_custom_size(self):
         """Validate and apply the custom width/height entered by the user."""
         try:
-            width  = int(self._custom_width_var.get())
+            width = int(self._custom_width_var.get())
             height = int(self._custom_height_var.get())
         except ValueError:
             self._show_error("Width and height must be whole numbers.")
@@ -333,7 +358,7 @@ class SettingsWindow:
         try:
             active = int(self._custom_font_active_var.get())
             nearby = int(self._custom_font_nearby_var.get())
-            far    = int(self._custom_font_far_var.get())
+            far = int(self._custom_font_far_var.get())
         except ValueError:
             self._show_error("Font sizes must be whole numbers.")
             return
@@ -348,7 +373,7 @@ class SettingsWindow:
         """Apply font sizes to the app state and all visible lyric labels."""
         self._app.font_size_active = active
         self._app.font_size_nearby = nearby
-        self._app.font_size_far    = far
+        self._app.font_size_far = far
 
         idx = self._app._last_highlight_index
         for i, (_, label) in enumerate(self._app.lyric_labels):
@@ -358,6 +383,8 @@ class SettingsWindow:
                 label.config(font=("Helvetica", nearby))
             else:
                 label.config(font=("Helvetica", far))
+
+        self._app._update_wraplengths()
 
     def _show_error(self, message):
         """Show a brief inline error label that disappears after 3 seconds."""
