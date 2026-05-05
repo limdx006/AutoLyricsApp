@@ -8,7 +8,7 @@ ACCENT_COLOR = "#16213e"  # Slightly lighter for info panel
 ERROR_COLOR = "#e94560"  # Reddish accent for errors/highlights
 
 WINDOW_SIZE_PRESETS = [
-    ("Small  — 320 × 640", (320, 640)),
+    ("Small  — 340 × 640", (340, 640)),
     ("Medium — 360 × 700", (360, 700)),
     ("Default — 400 × 800", (400, 800)),
     ("Large  — 500 × 900", (500, 900)),
@@ -21,3 +21,14 @@ FONT_SIZE_PRESETS = [
     ("Large  — 18 / 14 / 13", {"active": 18, "nearby": 14, "far": 13}),
     ("XLarge — 20 / 16 / 14", {"active": 20, "nearby": 16, "far": 14}),
 ]
+
+FONT_FAMILY = "Helvetica"
+
+# Color constants
+COLOR_ACTIVE_FG = "#ffffff"
+COLOR_NEARBY_FG = "#aaaaaa"
+COLOR_FAR_FG = "#555555"
+COLOR_ERROR_FG = "#e94560"
+COLOR_MUTED_FG = "#888888"
+COLOR_STATUS_FG = "#666666"
+COLOR_ARTIST_FG = "#a0a0a0"

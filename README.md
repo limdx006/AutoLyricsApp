@@ -118,13 +118,13 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 
 ```
 AutoLyricsApp/
-├── main.py          # Entry point — window setup, async thread, button wiring
-├── gui.py           # LyricsApp Tkinter class — all UI layout and animation
-├── media_sync.py    # Async sync loops, timeline correction, winsdk commands
-├── lyrics_utils.py  # LRC parsing, timestamp formatting, lyric index lookup
-├── config.py        # Window dimensions and colour constants
-├── icon.ico         # App icon (title bar, taskbar, and exe)
-└── build_exe.py     # PyInstaller build script — produces a single LyricsPlayer.exe
+├ main.py          # Entry point — window setup, async thread, button wiring
+├ gui.py           # LyricsApp Tkinter class — all UI layout and animation
+├ media_sync.py    # Async sync loops, timeline correction, winsdk commands
+├ lyrics_utils.py  # LRC parsing, timestamp formatting, lyric index lookup
+├ config.py        # Window dimensions and colour constants
+├ icon.ico         # App icon (title bar, taskbar, and exe)
+└ build_exe.py     # PyInstaller build script — produces a single LyricsPlayer.exe
 ```
 
 ---
