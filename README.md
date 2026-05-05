@@ -54,9 +54,16 @@ A real-time desktop lyrics player built with Python that detects the currently p
 - **Transport controls** — previous (◀◀), pause/resume (▌▌ / ▶), next (▶▶) buttons
 - **Progress bar** — live red fill with current and total time flanking the controls
 - **Refresh button (⟳)** — manually triggers a re-sync nudge mid-song
-- **Settings button (⚙)** — placeholder for future settings
+- **Settings button (⚙)** — opens a preferences window to adjust window size and lyric font size
 - **Status indicator** — shows Initialising / Syncing / Loading lyrics / Ready / Paused / Playing
 - **"No lyrics found" message** when no LRC data is available for a track
+
+### ⚙️ Settings Window
+- Opens as a modal preference window from the ⚙ button
+- **Window size** — 5 presets from Small (340×640) to XLarge (600×1000), plus a free-form custom input (width 300–800, height 500–1200)
+- **Lyric font size** — 4 presets from Small to XLarge controlling active, nearby, and far line sizes independently, plus a custom input for all three values
+- All changes apply immediately so the effect is visible before closing
+- Current values are pre-selected when the window opens
 
 ### 🎬 Animations
 - **Lyric highlight** — active line brightens and enlarges (ease-out, ~240ms), neighbours dim, distant lines fade to grey
@@ -118,13 +125,14 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 
 ```
 AutoLyricsApp/
-├ main.py          # Entry point — window setup, async thread, button wiring
-├ gui.py           # LyricsApp Tkinter class — all UI layout and animation
-├ media_sync.py    # Async sync loops, timeline correction, winsdk commands
-├ lyrics_utils.py  # LRC parsing, timestamp formatting, lyric index lookup
-├ config.py        # Window dimensions and colour constants
-├ icon.ico         # App icon (title bar, taskbar, and exe)
-└ build_exe.py     # PyInstaller build script — produces a single LyricsPlayer.exe
+├ main.py               # Entry point — window setup, async thread, button wiring
+├ gui.py                # LyricsApp Tkinter class — all UI layout and animation
+├ media_sync.py         # Async sync loops, timeline correction, winsdk commands
+├ lyrics_utils.py       # LRC parsing, timestamp formatting, lyric index lookup
+├ config.py             # Window dimensions, colour constants, and preset values
+├ settings_window.py    # Modal preferences window — window size and font size
+├ icon.ico              # App icon (title bar, taskbar, and exe)
+└ build_exe.py          # PyInstaller build script — produces a single LyricsPlayer.exe
 ```
 
 ---
