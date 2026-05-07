@@ -486,7 +486,12 @@ async def sync_song(app):
                         is_auto_refresh = abs(drift_from_local) <= 3.0
                         is_user_seek = abs(drift_from_local) > 3.0
 
-                        if is_auto_refresh or is_user_seek:
+                        # Guard against glitch where system_pos becomes 0 while playing
+                        if system_pos == 0 and local_now > 1.0 and not is_paused:
+                            # Transient glitch – do nothing
+                            pass
+
+                        elif is_auto_refresh or is_user_seek:
                             last_system_position = system_pos
                             last_sync_time = time.perf_counter()
                             local_position_at_sync = system_pos
