@@ -1,6 +1,7 @@
 import asyncio
 import syncedlyrics
 import time
+from lyrics_utils import to_pinyin
 
 from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionManager as MediaManager,
@@ -21,6 +22,9 @@ LYRIC_MODE = "original"
 current_title = None
 current_artist = None
 song_duration = 0
+
+# stores (timestamp, original_text) for current song
+original_lyrics_lines = []
 
 
 # Function to change lyric mode at runtime
@@ -171,12 +175,12 @@ async def auto_nudge(session, sleep_delay: float = 0.02):
     return system_pos
 
 
-def get_synced_lyrics(query):
+async def get_synced_lyrics(query):
     """Fetch lyrics. If romaji mode, fetch original Japanese then convert.
     If romaja mode, fetch original Korean then convert."""
     try:
         # Fetch original lyrics (no lang parameter for reliability)
-        lrc = syncedlyrics.search(query)
+        lrc = await asyncio.to_thread(syncedlyrics.search, query)
 
         if not lrc:
             return None
@@ -240,27 +244,28 @@ def get_synced_lyrics(query):
 
 async def _refresh_lyrics_async(app):
     """Refresh lyrics for the current song with the current LYRIC_MODE."""
-    global lyrics_lines, current_title, current_artist, is_initialized
+    global lyrics_lines, original_lyrics_lines, current_title, current_artist
 
-    if not current_title or not is_initialized:
-        return
+    if not original_lyrics_lines:
+        # No cached lyrics – fetch fresh (only happens after song change)
+        if not current_title:
+            return
+        query = f"{current_title} {current_artist}"
+        lrc_text = await get_synced_lyrics(query)
+        if lrc_text:
+            original_lyrics_lines = parse_lrc(lrc_text)
+        else:
+            original_lyrics_lines = []
 
-    app.root.after(0, lambda: app.update_status("Refreshing lyrics..."))
+    # Convert cached original lines to the current mode
+    language = detect_language(original_lyrics_lines)
+    lyrics_lines = convert_lyrics_to_mode(original_lyrics_lines, LYRIC_MODE, language)
 
-    query = f"{current_title} {current_artist}"
-    lrc_text = get_synced_lyrics(query)
-
-    if lrc_text:
-        from lyrics_utils import parse_lrc
-
-        lyrics_lines = parse_lrc(lrc_text)
-        lyrics_snapshot = lyrics_lines.copy()
-        app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l, -1))
-    else:
-        app.root.after(0, app.clear_lyrics)
-
+    # Update GUI
+    lyrics_snapshot = lyrics_lines.copy()
+    app.root.after(0, lambda: app.set_detected_language(language))
+    app.root.after(0, lambda l=lyrics_snapshot: app.load_lyrics(l, -1))
     app.root.after(0, lambda: app.update_status("Ready"))
-
 
 def register_lyric_mode_change(app, loop):
     """Register a callback for changing lyric mode from the GUI."""
@@ -329,18 +334,11 @@ def register_lyric_mode_change(app, loop):
     """Wire the GUI lyric mode selector so changing mode reloads the current lyrics."""
 
     def on_mode_change(mode):
-        # Reload lyrics with the new mode — runs on the Tkinter thread via after()
-        if hasattr(app, "_current_lyrics_snapshot") and app._current_lyrics_snapshot:
-            app.root.after(
-                0,
-                lambda: app.load_lyrics(
-                    app._current_lyrics_snapshot,
-                    app._last_highlight_index,
-                ),
-            )
+        if set_lyric_mode(mode):
+            # No network – just refresh from cache
+            asyncio.run_coroutine_threadsafe(_refresh_lyrics_async(app), loop)
 
     app.set_lyric_mode_callback = on_mode_change
-
 
 async def _refresh_sync_async(app, sleep_delay: float = 0.1):
     sessions = await MediaManager.request_async()
@@ -416,12 +414,15 @@ async def sync_song(app):
                 last_accepted_system_pos = system_pos
 
                 query = f"{title} {artist}"
-                lrc_text = get_synced_lyrics(query)
+                lrc_text = await get_synced_lyrics(query)
 
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
+                    original_lyrics_lines = lyrics_lines.copy() 
                 else:
                     lyrics_lines = []
+                    original_lyrics_lines = []
+
 
                 # Detect language from the parsed lyrics
                 language = detect_language(lyrics_lines)
@@ -499,6 +500,23 @@ async def sync_song(app):
 
         await asyncio.sleep(0.5)
 
+
+def convert_lyrics_to_mode(lyrics, mode, detected_language):
+    """Convert a list of (timestamp, text) to the requested mode."""
+    if mode == "original":
+        return lyrics
+    converted = []
+    for ts, text in lyrics:
+        if mode == "romaji" and detected_language == "japanese":
+            new_text = convert_to_romaji(text)
+        elif mode == "pinyin" and detected_language == "chinese":
+            new_text = to_pinyin(text)
+        elif mode == "romaja" and detected_language == "korean":
+            new_text = convert_to_romaja(text)
+        else:
+            new_text = text
+        converted.append((ts, new_text))
+    return converted
 
 async def progress_clock(app):
     global local_position_at_sync, last_sync_time, is_paused, paused_position, is_initialized
