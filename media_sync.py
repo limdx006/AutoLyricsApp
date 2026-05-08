@@ -153,8 +153,8 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2):
             new_info = session.get_playback_info()
             if new_info.playback_status != PlaybackStatus.PLAYING:
                 # It didn't resume! Try once more
-                await session.try_play_async()
                 await precise_sleep(sleep_delay)
+                await session.try_play_async()
 
     # Final position check
     sessions = await MediaManager.request_async()
@@ -431,8 +431,8 @@ async def sync_song(app):
                         is_user_seek = abs(drift_from_local) > 3.0
 
                         # Guard against glitch where system_pos becomes 0 while playing
-                        if system_pos == 0 and local_now > 1.0 and not is_paused:
-                            # Transient glitch – do nothing
+                        if system_pos < last_accepted_system_pos - 5.0 and local_now > 1.0 and not is_paused:
+                            # Position jumped backwards by more than 5s while playing — glitch
                             pass
 
                         elif is_auto_refresh or is_user_seek:
