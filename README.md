@@ -99,7 +99,7 @@ Classifies each incoming system position as one of:
 - **User seek** — large drift from local estimate (>3s) → accept and resync
 
 ### Auto-Nudge
-On first run, Windows often reports a stale or zero timeline position. The app sends a pause, then an immediate resume command to force Windows to flush the real current position before loading lyrics.
+On first run, Windows often reports a stale or zero timeline position. The app sends a pause, then an immediate resume command — using the same media session object throughout — to force Windows to flush the real current position before loading lyrics.
 
 ---
 
@@ -115,7 +115,7 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 - **Windows only** — requires Windows 10 or 11
 - The media player must expose system media controls (Spotify, browsers, etc.)
 - Lyrics availability depends on the `syncedlyrics` library — some songs may have no or wrong LRC data
-- The auto-nudge causes a very brief (~40ms) stutter on first launch to force a position sync — if the music stops, press play or use the ⟳ refresh button to re-sync manually
+- The auto-nudge causes a very brief (~50ms) stutter on first launch to force a position sync — if the music stops, press play or use the ⟳ refresh button to re-sync manually
 - **Use YouTube Music instead of YouTube** — YouTube Music lyrics tend to sync more accurately with the app, likely because the `syncedlyrics` library has better LRC data for it. Standard YouTube may have off-sync or missing lyrics
 - **Multiple browser tabs** — the app reads media info from the Windows media session, which reports whichever source Windows considers active. If multiple tabs or apps are playing (or have recently played) audio, the app may pick up the wrong one — for example reading a video you are watching instead of the song you are listening to. For best results, keep only one media source active at a time
 
@@ -134,6 +134,26 @@ AutoLyricsApp/
 ├ icon.ico              # App icon (title bar, taskbar, and exe)
 └ build_exe.py          # PyInstaller build script — produces a single LyricsPlayer.exe
 ```
+
+---
+
+## 📚 Dependencies
+
+The following libraries are used by this project:
+
+| Library | Purpose |
+|---|---|
+| `winsdk` | Windows Media Session API access — detects the currently playing song and controls playback (pause, resume, skip) |
+| `syncedlyrics` | Fetches timestamped LRC lyrics from online sources |
+| `cutlet` | Japanese text → Hepburn romaji conversion (primary) |
+| `pykakasi` | Japanese text → romaji fallback when `cutlet` is unavailable |
+| `fugashi` | Japanese morphological analysis — required by `cutlet` |
+| `unidic-lite` | Compact Japanese dictionary — required by `fugashi` |
+| `pypinyin` | Chinese text → Pinyin with tone marks |
+| `korean-romanizer` | Korean Hangul → Revised Romanisation (Romaja) |
+| `pyinstaller` | Bundles the app into a single `LyricsPlayer.exe` |
+
+All dependencies are listed in `requirements.txt` and bundled automatically into the executable by `build_exe.py`.
 
 ---
 
