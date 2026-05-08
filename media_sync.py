@@ -171,71 +171,21 @@ async def auto_nudge(session, sleep_delay: float = 0.02):
     return system_pos
 
 
-def get_synced_lyrics(query):
-    """Fetch lyrics. If romaji mode, fetch original Japanese then convert.
-    If romaja mode, fetch original Korean then convert."""
+def _fetch_lyrics_sync(query):
+    """Synchronous lyrics fetch — runs inside a thread pool via run_in_executor."""
     try:
-        # Fetch original lyrics (no lang parameter for reliability)
         lrc = syncedlyrics.search(query)
-
-        if not lrc:
-            return None
-
-        # If romaji mode, convert each line to romaji
-        if LYRIC_MODE == "romaji":
-            lines = lrc.strip().split("\n")
-            converted_lines = []
-
-            for line in lines:
-                # Parse the timestamp part [mm:ss.xx]
-                import re
-
-                match = re.match(r"(\[\d{2}:\d{2}\.\d{2,3}\])(.*)", line)
-                if match:
-                    timestamp = match.group(1)
-                    text = match.group(2).strip()
-                    romaji_text = convert_to_romaji(text)
-                    converted_lines.append(f"{timestamp}{romaji_text}")
-                else:
-                    converted_lines.append(line)
-
-            return "\n".join(converted_lines)
-
-        # If romaja mode, convert each line to Korean Romaja
-        elif LYRIC_MODE == "romaja":
-            lines = lrc.strip().split("\n")
-            converted_lines = []
-
-            for line in lines:
-                import re
-
-                match = re.match(r"(\[\d{2}:\d{2}\.\d{2,3}\])(.*)", line)
-                if match:
-                    timestamp = match.group(1)
-                    text = match.group(2).strip()
-                    romaja_text = convert_to_romaja(text)
-                    converted_lines.append(f"{timestamp}{romaja_text}")
-                else:
-                    converted_lines.append(line)
-
-            return "\n".join(converted_lines)
-
-        # If english mode, try with lang parameter (may fail, fallback to original)
-        elif LYRIC_MODE == "english":
-            try:
-                lrc_en = syncedlyrics.search(query, lang="en")
-                if lrc_en:
-                    return lrc_en
-            except Exception:
-                pass  # Fallback to original
-            return lrc
-
-        # Original mode — just return as-is
-        else:
-            return lrc
-
+        return lrc if lrc else None
     except Exception:
         return None
+
+
+async def get_synced_lyrics(query):
+    """Fetch synced LRC lyrics without blocking the event loop.
+    Offloads the synchronous network call to a thread pool so progress_clock
+    and all other async tasks continue running normally during the search."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _fetch_lyrics_sync, query)
 
 
 async def _refresh_lyrics_async(app):
@@ -248,7 +198,7 @@ async def _refresh_lyrics_async(app):
     app.root.after(0, lambda: app.update_status("Refreshing lyrics..."))
 
     query = f"{current_title} {current_artist}"
-    lrc_text = get_synced_lyrics(query)
+    lrc_text = await get_synced_lyrics(query)
 
     if lrc_text:
         from lyrics_utils import parse_lrc
@@ -416,7 +366,7 @@ async def sync_song(app):
                 last_accepted_system_pos = system_pos
 
                 query = f"{title} {artist}"
-                lrc_text = get_synced_lyrics(query)
+                lrc_text = await get_synced_lyrics(query)
 
                 if lrc_text:
                     lyrics_lines = parse_lrc(lrc_text)
