@@ -1,6 +1,5 @@
 import re
 import cutlet as _cutlet
-import pykakasi as _pykakasi
 from pypinyin import lazy_pinyin as _lazy_pinyin, Style as _Style
 
 """LYRICS UTILS - Pure helper functions for parsing LRC lyrics, formatting timestamps,
@@ -16,7 +15,6 @@ COLOR_MAP = {
 
 # Single shared instances — initialising these is expensive so do it once at import
 _cutlet_engine = _cutlet.Cutlet()
-_kakasi_engine = _pykakasi.kakasi()
 
 # Lazy-loaded Korean romanizer engine
 _korean_romanizer = None
@@ -66,9 +64,7 @@ def to_romaji(text):
     try:
         return _cutlet_engine.romaji(text)
     except Exception:
-        # pykakasi fallback if cutlet fails
-        result = _kakasi_engine.convert(text)
-        return " ".join(item["hepburn"] for item in result if item["hepburn"])
+        return text
 
 
 def to_pinyin(text):

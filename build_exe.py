@@ -23,7 +23,6 @@ PyInstaller.__main__.run([
 
     # Hidden imports - romaji conversion
     '--hidden-import', 'cutlet',
-    '--hidden-import', 'pykakasi',
     '--hidden-import', 'fugashi',
     '--hidden-import', 'unidic_lite',
 
@@ -38,7 +37,6 @@ PyInstaller.__main__.run([
     '--collect-data', 'unidic_lite',
     '--collect-data', 'fugashi',
     '--collect-data', 'cutlet',
-    '--collect-data', 'pykakasi',
     '--collect-data', 'pypinyin',
     '--collect-data', 'korean_romanizer',
 
@@ -50,7 +48,6 @@ PyInstaller.__main__.run([
     '--collect-submodules', 'unidic_lite',
     '--collect-submodules', 'fugashi',
     '--collect-submodules', 'cutlet',
-    '--collect-submodules', 'pykakasi',
     '--collect-submodules', 'pypinyin',
     '--collect-submodules', 'korean_romanizer',
 ])

@@ -69,28 +69,11 @@ def get_romaji_engine():
 
     try:
         import cutlet
-
         _romaji_engine = cutlet.Cutlet()
         _romaji_backend = "cutlet"
         return _romaji_engine
     except Exception as e:
-        print("cutlet initialization failed, falling back to pykakasi:", e)
-
-    try:
-        from pykakasi import kakasi
-
-        kakasi_obj = kakasi()
-        kakasi_obj.setMode("J", "a")
-        kakasi_obj.setMode("K", "a")
-        kakasi_obj.setMode("H", "a")
-        kakasi_obj.setMode("a", "a")
-        kakasi_obj.setMode("s", True)
-        _romaji_engine = kakasi_obj.getConverter()
-        _romaji_backend = "pykakasi"
-        print("Using pykakasi for romaji conversion")
-        return _romaji_engine
-    except Exception as e:
-        print("pykakasi initialization failed:", e)
+        print("cutlet initialization failed:", e)
         _romaji_engine = None
         _romaji_backend = None
         return None
