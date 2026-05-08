@@ -129,29 +129,41 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
-async def auto_nudge(session, sleep_delay: float = 0.02):
+async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2):
     """Force a pause/resume cycle to refresh the current media position."""
+    playback_info = session.get_playback_info()
+    was_playing = playback_info.playback_status == PlaybackStatus.PLAYING
+    
     await session.try_pause_async()
     await precise_sleep(sleep_delay)
 
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
-    if session:
-        timeline = session.get_timeline_properties()
-        system_pos = timeline.position.total_seconds()
-    else:
-        return None
+    # Get position after pause
+    timeline = session.get_timeline_properties()
+    system_pos_after_pause = timeline.position.total_seconds()
 
-    await session.try_play_async()
-    await precise_sleep(sleep_delay)
+    if was_playing:
+        # Try to resume using same session
+        await session.try_play_async()
+        await precise_sleep(sleep_delay)
+        
+        # Verify it actually resumed by checking status
+        sessions = await MediaManager.request_async()
+        session = sessions.get_current_session()
+        if session:
+            new_info = session.get_playback_info()
+            if new_info.playback_status != PlaybackStatus.PLAYING:
+                # It didn't resume! Try once more
+                await session.try_play_async()
+                await precise_sleep(sleep_delay)
 
+    # Final position check
     sessions = await MediaManager.request_async()
     session = sessions.get_current_session()
     if session:
         timeline = session.get_timeline_properties()
         return timeline.position.total_seconds()
 
-    return system_pos
+    return system_pos_after_pause
 
 
 def _fetch_lyrics_sync(query):
