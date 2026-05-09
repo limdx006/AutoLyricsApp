@@ -129,8 +129,16 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
-async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2):
-    """Force a pause/resume cycle to refresh the current media position."""
+async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2, resume_after: bool = False):
+    """Force a pause/resume cycle to refresh the current media position.
+
+    Args:
+        session: The media session to nudge.
+        sleep_delay: Delay between operations in seconds.
+        max_retries: Number of retry attempts (unused, kept for compatibility).
+        resume_after: If True, always resume playback after the nudge (for refresh button).
+                      If False, only resume if it was already playing (for startup sync).
+    """
     playback_info = session.get_playback_info()
     was_playing = playback_info.playback_status == PlaybackStatus.PLAYING
     
@@ -141,7 +149,8 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2):
     timeline = session.get_timeline_properties()
     system_pos_after_pause = timeline.position.total_seconds()
 
-    if was_playing:
+    # Resume if either: it was already playing, OR we explicitly want to resume (refresh button)
+    if was_playing or resume_after:
         # Try to resume using same session
         await session.try_play_async()
         await precise_sleep(sleep_delay)
@@ -295,7 +304,7 @@ async def _refresh_sync_async(app, sleep_delay: float = 0.1):
         return
 
     app.root.after(0, lambda: app.update_status("Refreshing..."))
-    new_system_pos = await auto_nudge(session, sleep_delay=sleep_delay)
+    new_system_pos = await auto_nudge(session, sleep_delay=sleep_delay, resume_after=True)
 
     if new_system_pos is not None:
         global last_system_position, last_sync_time, local_position_at_sync, last_accepted_system_pos
@@ -350,7 +359,7 @@ async def sync_song(app):
 
                 if should_initialise:
                     app.root.after(0, lambda: app.update_status("Syncing..."))
-                    new_system_pos = await auto_nudge(session, sleep_delay=0.02)
+                    new_system_pos = await auto_nudge(session, sleep_delay=0.02, resume_after=False)
                     if new_system_pos is not None:
                         system_pos = new_system_pos
 
