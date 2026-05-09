@@ -146,7 +146,6 @@ The following libraries are used by this project:
 | `winsdk` | Windows Media Session API access — detects the currently playing song and controls playback (pause, resume, skip) |
 | `syncedlyrics` | Fetches timestamped LRC lyrics from online sources |
 | `cutlet` | Japanese text → Hepburn romaji conversion (primary) |
-| `pykakasi` | Japanese text → romaji fallback when `cutlet` is unavailable |
 | `fugashi` | Japanese morphological analysis — required by `cutlet` |
 | `unidic-lite` | Compact Japanese dictionary — required by `fugashi` |
 | `pypinyin` | Chinese text → Pinyin with tone marks |
