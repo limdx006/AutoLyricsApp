@@ -8,6 +8,7 @@ from winsdk.windows.media.control import (
 )
 
 from lyrics_utils import parse_lrc, get_current_lyric_index, detect_language
+from media_selector import get_best_session
 
 """MEDIA SYNC - All mutable playback state lives here as module-level globals.
 The two async loops (sync_song and progress_clock) read and write these variables.
@@ -156,8 +157,8 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2, r
         await precise_sleep(sleep_delay)
         
         # Verify it actually resumed by checking status
-        sessions = await MediaManager.request_async()
-        session = sessions.get_current_session()
+        sessions_mgr = await MediaManager.request_async()
+        session = sessions_mgr.get_current_session()
         if session:
             new_info = session.get_playback_info()
             if new_info.playback_status != PlaybackStatus.PLAYING:
@@ -166,8 +167,8 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2, r
                 await session.try_play_async()
 
     # Final position check
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
+    sessions_mgr = await MediaManager.request_async()
+    session = sessions_mgr.get_current_session()
     if session:
         timeline = session.get_timeline_properties()
         return timeline.position.total_seconds()
@@ -228,8 +229,7 @@ def register_lyric_mode_change(app, loop):
 
 
 async def _toggle_play_pause_async():
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
+    session, _, _ = await get_best_session()
     if session:
         await session.try_toggle_play_pause_async()
 
@@ -244,15 +244,13 @@ def register_pause_button(app, loop):
 
 
 async def _next_song_async():
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
+    session, _, _ = await get_best_session()
     if session:
         await session.try_skip_next_async()
 
 
 async def _prev_song_async():
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
+    session, _, _ = await get_best_session()
     if session:
         await session.try_skip_previous_async()
 
@@ -297,8 +295,7 @@ def register_lyric_mode_change(app, loop):
 
 
 async def _refresh_sync_async(app, sleep_delay: float = 0.1):
-    sessions = await MediaManager.request_async()
-    session = sessions.get_current_session()
+    session, _, _ = await get_best_session()
     if not session:
         app.root.after(0, lambda: app.update_status("No media session"))
         return
@@ -324,11 +321,9 @@ async def sync_song(app):
     global lyrics_lines
 
     while True:
-        sessions = await MediaManager.request_async()
-        session = sessions.get_current_session()
+        session, info, score = await get_best_session()
 
-        if session:
-            info = await session.try_get_media_properties_async()
+        if session and info:
             timeline = session.get_timeline_properties()
             playback_info = session.get_playback_info()
             status = playback_info.playback_status
