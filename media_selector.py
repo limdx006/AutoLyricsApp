@@ -6,6 +6,9 @@ from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
 
+# Toggle to print a scoring breakdown whenever a re-score actually runs
+DEBUG_MEDIA_SELECTOR = True
+
 """MEDIA SELECTOR - Scores all active Windows media sessions and returns the one
 most likely to be music. This replaces the naive get_current_session() approach,
 which blindly returns whatever Windows considers 'active' — often a browser tab
@@ -21,9 +24,6 @@ passed). Between those events the previous winner is returned instantly, so the
 
 Set DEBUG_MEDIA_SELECTOR = True to print a per-session scoring breakdown to the
 terminal every time a real re-score happens. Useful for tuning weights."""
-
-# Toggle to print a scoring breakdown whenever a re-score actually runs
-DEBUG_MEDIA_SELECTOR = True
 
 # Full re-score runs at most once per this many seconds even if nothing changed
 RESCORE_INTERVAL = 10.0
