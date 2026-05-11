@@ -32,32 +32,75 @@ RESCORE_INTERVAL = 10.0
 _POSITION_DELTA_THRESHOLD = 0.3
 
 # Bonus / penalty applied based on the lyrics probe result
-_LYRICS_FOUND_BONUS    = 60
+_LYRICS_FOUND_BONUS = 60
 _LYRICS_MISSING_PENALTY = 40
 
 _BLACKLISTED_APPS = {
-    "teams", "zoom", "discord", "slack", "skype",
-    "obs", "mpc-hc", "vlc", "wmplayer",
+    "teams",
+    "zoom",
+    "discord",
+    "slack",
+    "skype",
+    "obs",
+    "mpc-hc",
+    "vlc",
+    "wmplayer",
 }
 
 _MUSIC_APP_ALLOWLIST = {
-    "spotify", "tidal", "applemusic", "musicbee", "foobar",
-    "aimp", "winamp", "mediamonkey", "amazon music", "deezer", "soundcloud",
+    "spotify",
+    "tidal",
+    "applemusic",
+    "musicbee",
+    "foobar",
+    "aimp",
+    "winamp",
+    "mediamonkey",
+    "amazon music",
+    "deezer",
+    "soundcloud",
 }
 
 _BROWSER_APPS = {"chrome", "msedge", "firefox", "opera", "brave", "vivaldi"}
 
 _JUNK_ARTISTS = {
-    "youtube", "unknown", "chrome", "microsoft edge",
-    "firefox", "opera", "brave", "vivaldi", "windows",
+    "youtube",
+    "unknown",
+    "chrome",
+    "microsoft edge",
+    "firefox",
+    "opera",
+    "brave",
+    "vivaldi",
+    "windows",
 }
 
 _VIDEO_TITLE_PATTERNS = [
-    "episode", "full hd", "live stream", "breaking news",
-    "tutorial", "reaction", "vlog", "part ", "ep.",
-    " - youtube", " | youtube", " s0", " e0", " season ",
-    "review", "how to", "full movie", "gameplay",
-    "直播", "實況", "恐怖", "新聞", "攻略", "教學", "完整版",
+    "episode",
+    "full hd",
+    "live stream",
+    "breaking news",
+    "tutorial",
+    "reaction",
+    "vlog",
+    "part ",
+    "ep.",
+    " - youtube",
+    " | youtube",
+    " s0",
+    " e0",
+    " season ",
+    "review",
+    "how to",
+    "full movie",
+    "gameplay",
+    "直播",
+    "實況",
+    "恐怖",
+    "新聞",
+    "攻略",
+    "教學",
+    "完整版",
 ]
 
 
@@ -253,7 +296,9 @@ async def _run_lyrics_probe(key: tuple[str, str]) -> None:
 
     if DEBUG_MEDIA_SELECTOR:
         found = _lyrics_probe_cache[key]
-        print(f"[MediaSelector] lyrics probe '{query}' -> {'found' if found else 'not found'} — re-score triggered")
+        print(
+            f"[MediaSelector] lyrics probe '{query}' -> {'found' if found else 'not found'} — re-score triggered"
+        )
 
 
 def _schedule_lyrics_probe(title: str, artist: str) -> None:
@@ -346,7 +391,9 @@ async def get_best_session():
             # Schedule a lyrics probe for this session (no-op if already done)
             _schedule_lyrics_probe(info.title or "", (info.artist or "").strip())
 
-            score, reasons = _score_session(app_id, info, playback_info, position_moving)
+            score, reasons = _score_session(
+                app_id, info, playback_info, position_moving
+            )
 
             if DEBUG_MEDIA_SELECTOR:
                 label = f"{app_id[:40]}  |  '{(info.title or '')[:40]}'"
@@ -364,7 +411,11 @@ async def get_best_session():
             continue
 
     if DEBUG_MEDIA_SELECTOR:
-        winner_id = (best_session.source_app_user_model_id or "none") if best_session else "none"
+        winner_id = (
+            (best_session.source_app_user_model_id or "none")
+            if best_session
+            else "none"
+        )
         print(f"  => winner: {winner_id}  score: {best_score}\n")
 
     if best_score < -50:
