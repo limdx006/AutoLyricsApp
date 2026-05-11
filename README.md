@@ -22,8 +22,13 @@ A real-time desktop lyrics player built with Python that detects the currently p
 ## ✨ Features
 
 ### 🎧 Media Detection
-- Auto-detects currently playing music from Windows Media session
-- Works with Spotify, YouTube (browser), and other apps that expose system media controls
+- Auto-detects the most likely music source from all active Windows media sessions using a multi-signal scoring system — targeting 90%+ accuracy even with multiple browser tabs or apps open simultaneously
+- Scores every session across signals like playback state, artist validity, album presence, thumbnail, title cleanliness, and lyrics availability — the highest-scoring session wins
+- Known music apps (Spotify, Tidal, MusicBee, AIMP, etc.) receive a strong bonus; browsers are scored cautiously and recover points only if their metadata looks genuinely musical
+- Titles matching video patterns ("Episode", "Tutorial", "Live Stream", "Full HD", CJK video keywords, etc.) are penalised to avoid picking up YouTube videos over music
+- A background **lyrics probe** runs once per `(title, artist)` pair — sessions whose track has synced lyrics available get a score bonus; sessions with no match are penalised, making music sources rank naturally higher than video sources
+- Re-scoring is lazy: a full session poll only runs on song change, when a lyrics probe result arrives, or every 10 seconds — the 0.5 s sync loop returns the cached winner instantly between those events
+- Works with Spotify, YouTube Music, and other apps that expose Windows system media controls
 - Detects song changes, pause/resume, and user seeks automatically
 
 ### ⏱ High-Precision Playback Tracking
@@ -91,6 +96,7 @@ A real-time desktop lyrics player built with Python that detects the currently p
 |---|---|---|
 | `progress_clock` | ~10ms | Progress bar updates, lyric highlight |
 | `sync_song` | ~500ms | Song change detection, pause/resume, seek correction |
+| `media_selector` | lazy | Session scoring — re-runs on song change, lyrics probe result, or every 10 s |
 
 ### Timeline Correction Logic (sync_song)
 Classifies each incoming system position as one of:
@@ -117,7 +123,6 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 - Lyrics availability depends on the `syncedlyrics` library — some songs may have no or wrong LRC data
 - The auto-nudge causes a very brief (~50ms) stutter on first launch to force a position sync — if the music stops, press play or use the ⟳ refresh button to re-sync manually
 - **Use YouTube Music instead of YouTube** — YouTube Music lyrics tend to sync more accurately with the app, likely because the `syncedlyrics` library has better LRC data for it. Standard YouTube may have off-sync or missing lyrics
-- **Multiple browser tabs** — the app reads media info from the Windows media session, which reports whichever source Windows considers active. If multiple tabs or apps are playing (or have recently played) audio, the app may pick up the wrong one — for example reading a video you are watching instead of the song you are listening to. For best results, keep only one media source active at a time
 
 ---
 
@@ -131,6 +136,7 @@ AutoLyricsApp/
 ├ lyrics_utils.py       # LRC parsing, timestamp formatting, lyric index lookup
 ├ config.py             # Window dimensions, colour constants, and preset values
 ├ settings_window.py    # Modal preferences window — window size and font size
+├ media_selector.py     # Multi-signal session scorer — picks the best music source from all active sessions
 ├ icon.ico              # App icon (title bar, taskbar, and exe)
 └ build_exe.py          # PyInstaller build script — produces a single LyricsPlayer.exe
 ```
