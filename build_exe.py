@@ -11,6 +11,7 @@ PyInstaller.__main__.run([
     '--add-data', 'gui.py;.',
     '--add-data', 'lyrics_utils.py;.',
     '--add-data', 'media_sync.py;.',
+    '--add-data', 'media_selector.py;.',
 
     # Icon: bundle as data AND embed in exe
     '--add-data', 'icon.ico;.',         # Runtime access
