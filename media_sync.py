@@ -8,7 +8,7 @@ from winsdk.windows.media.control import (
 )
 
 from lyrics_utils import parse_lrc, get_current_lyric_index, detect_language
-from media_selector import get_best_session
+from media_selector import get_best_session, invalidate as _invalidate_media_selector
 
 """MEDIA SYNC - All mutable playback state lives here as module-level globals.
 The two async loops (sync_song and progress_clock) read and write these variables.
@@ -342,6 +342,7 @@ async def sync_song(app):
                 song_duration = duration
                 is_paused = False
                 lyrics_lines = []
+                _invalidate_media_selector()
 
                 app.root.after(
                     0,
