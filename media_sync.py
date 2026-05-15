@@ -7,7 +7,13 @@ from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
 
-from lyrics_utils import parse_lrc, get_current_lyric_index, detect_language
+from lyrics_utils import (
+    parse_lrc,
+    get_current_lyric_index,
+    detect_language,
+    to_romaji,
+    to_romanized_korean,
+)
 from media_selector import get_best_session, invalidate as _invalidate_media_selector
 
 """MEDIA SYNC - All mutable playback state lives here as module-level globals.
@@ -52,77 +58,6 @@ is_initialized = False
 
 # Parsed lyrics for the current track
 lyrics_lines = []
-
-
-# Initialize romaji converter (lazy load to avoid import overhead if not needed)
-_romaji_engine = None
-_romaji_backend = None
-
-# Initialize Korean romanizer (lazy load)
-_korean_romanizer = None
-
-
-def get_romaji_engine():
-    """Lazy-load a romaji converter using cutlet first, then pykakasi."""
-    global _romaji_engine, _romaji_backend
-    if _romaji_engine is not None:
-        return _romaji_engine
-
-    try:
-        import cutlet
-        _romaji_engine = cutlet.Cutlet()
-        _romaji_backend = "cutlet"
-        return _romaji_engine
-    except Exception as e:
-        print("cutlet initialization failed:", e)
-        _romaji_engine = None
-        _romaji_backend = None
-        return None
-
-
-def get_korean_romanizer():
-    """Lazy-load the Korean romanizer."""
-    global _korean_romanizer
-    if _korean_romanizer is not None:
-        return _korean_romanizer
-    try:
-        from korean_romanizer.romanizer import Romanizer
-
-        _korean_romanizer = Romanizer
-        return _korean_romanizer
-    except Exception as e:
-        print("korean-romanizer initialization failed:", e)
-        _korean_romanizer = None
-        return None
-
-
-def convert_to_romaji(text):
-    """Convert Japanese text to romaji using the available converter."""
-    engine = get_romaji_engine()
-    if not engine:
-        return text
-
-    try:
-        if _romaji_backend == "cutlet":
-            return engine.romaji(text)
-        if _romaji_backend == "pykakasi":
-            return engine.do(text)
-    except Exception:
-        pass
-
-    return text
-
-
-def convert_to_romaja(text):
-    """Convert Korean text to Revised Romanization (Romaja)."""
-    Romanizer = get_korean_romanizer()
-    if not Romanizer:
-        return text
-    try:
-        r = Romanizer(text)
-        return r.romanize()
-    except Exception:
-        return text
 
 
 # High-precision async sleep for Windows
@@ -275,23 +210,6 @@ def register_refresh_button(app, loop):
         asyncio.run_coroutine_threadsafe(_refresh_sync_async(app), loop)
 
     app.set_refresh_callback(on_click)
-
-
-def register_lyric_mode_change(app, loop):
-    """Wire the GUI lyric mode selector so changing mode reloads the current lyrics."""
-
-    def on_mode_change(mode):
-        # Reload lyrics with the new mode — runs on the Tkinter thread via after()
-        if hasattr(app, "_current_lyrics_snapshot") and app._current_lyrics_snapshot:
-            app.root.after(
-                0,
-                lambda: app.load_lyrics(
-                    app._current_lyrics_snapshot,
-                    app._last_highlight_index,
-                ),
-            )
-
-    app.set_lyric_mode_callback = on_mode_change
 
 
 async def _refresh_sync_async(app, sleep_delay: float = 0.1):
