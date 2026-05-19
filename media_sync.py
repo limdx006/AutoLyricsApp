@@ -355,6 +355,7 @@ async def sync_song(app):
 
                         # Guard against glitch where system_pos becomes 0 while playing
                         if system_pos < last_accepted_system_pos - 5.0 and local_now > 1.0 and not is_paused:
+                            print(f"Glitch detected: system_pos jumped from {last_accepted_system_pos:.1f}s to {system_pos:.1f}s while local position is {local_now:.1f}s. Ignoring.")
                             # Position jumped backwards by more than 5s while playing — glitch
                             pass
 
