@@ -50,6 +50,7 @@ last_system_position = 0
 last_sync_time = 0
 local_position_at_sync = 0
 last_accepted_system_pos = 0
+last_window_position = None
 
 # Pause tracking
 is_paused = False
@@ -65,50 +66,100 @@ async def precise_sleep(sleep_for: float) -> None:
     await asyncio.get_running_loop().run_in_executor(None, time.sleep, sleep_for)
 
 
-async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 2, resume_after: bool = False):
+async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 3, resume_after: bool = False):
     """Force a pause/resume cycle to refresh the current media position.
+    Always works on the current active session after pause."""
+    from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus
 
-    Args:
-        session: The media session to nudge.
-        sleep_delay: Delay between operations in seconds.
-        max_retries: Number of retry attempts (unused, kept for compatibility).
-        resume_after: If True, always resume playback after the nudge (for refresh button).
-                      If False, only resume if it was already playing (for startup sync).
-    """
-    playback_info = session.get_playback_info()
-    was_playing = playback_info.playback_status == PlaybackStatus.PLAYING
-    
-    await session.try_pause_async()
+    # Remember whether the session was playing BEFORE any action
+    try:
+        playback_info = session.get_playback_info()
+        was_playing = playback_info.playback_status == PlaybackStatus.PLAYING
+    except Exception:
+        was_playing = False
+
+    # Pause the session (if possible)
+    try:
+        await session.try_pause_async()
+    except Exception:
+        pass
     await precise_sleep(sleep_delay)
 
-    # Get position after pause
-    timeline = session.get_timeline_properties()
-    system_pos_after_pause = timeline.position.total_seconds()
+    # ----- After pause, get the current active session -----
+    try:
+        manager = await MediaManager.request_async()
+        current_session = manager.get_current_session()
+        if not current_session:
+            # Fallback: try to re‑obtain the original session’s equivalent
+            current_session = session
+    except Exception:
+        current_session = session
 
-    # Resume if either: it was already playing, OR we explicitly want to resume (refresh button)
-    if was_playing or resume_after:
-        # Try to resume using same session
-        await session.try_play_async()
-        await precise_sleep(sleep_delay)
-        
-        # Verify it actually resumed by checking status
-        sessions_mgr = await MediaManager.request_async()
-        session = sessions_mgr.get_current_session()
-        if session:
-            new_info = session.get_playback_info()
-            if new_info.playback_status != PlaybackStatus.PLAYING:
-                # It didn't resume! Try once more
-                await precise_sleep(sleep_delay)
-                await session.try_play_async()
+    # Obtain timeline properties from the current session
+    try:
+        timeline = current_session.get_timeline_properties()
+        pos_after_pause = timeline.position.total_seconds()
+    except Exception:
+        pos_after_pause = 0.0
 
-    # Final position check
-    sessions_mgr = await MediaManager.request_async()
-    session = sessions_mgr.get_current_session()
-    if session:
-        timeline = session.get_timeline_properties()
-        return timeline.position.total_seconds()
+    # Resume if needed
+    should_resume = was_playing or resume_after
+    if should_resume:
+        resumed = False
+        attempt = 0
+        max_attempts = max_retries + 2  # Extra buffer for final fallback attempts
 
-    return system_pos_after_pause
+        while attempt < max_attempts and not resumed:
+            # Always fetch the freshest session from the manager
+            try:
+                manager_fresh = await MediaManager.request_async()
+                work_session = manager_fresh.get_current_session()
+                if not work_session:
+                    work_session = current_session
+            except Exception:
+                work_session = current_session
+
+            # Attempt to resume
+            try:
+                await work_session.try_play_async()
+            except Exception as exc:
+                print(f"  auto_nudge: try_play_async() failed on attempt {attempt + 1}: {exc}")
+
+            # Variable delay: shorter on early attempts, longer on later ones
+            attempt_delay = sleep_delay * max(1, (attempt // 2) + 1)
+            await precise_sleep(attempt_delay)
+
+            # Verify playback status from the freshest session
+            try:
+                manager_verify = await MediaManager.request_async()
+                verify_session = manager_verify.get_current_session()
+                if verify_session:
+                    info = verify_session.get_playback_info()
+                    if info.playback_status == PlaybackStatus.PLAYING:
+                        resumed = True
+                        current_session = verify_session
+                        print(f"  auto_nudge: Confirmed PLAYING on attempt {attempt + 1}")
+                        break
+                    else:
+                        print(f"  auto_nudge: Status not PLAYING on attempt {attempt + 1}: {info.playback_status}")
+            except Exception as exc:
+                print(f"  auto_nudge: Verification check failed on attempt {attempt + 1}: {exc}")
+
+            attempt += 1
+
+        if not resumed:
+            print(f"  auto_nudge: FAILED to resume after {attempt} attempts. Music may remain paused.")
+        else:
+            print(f"  auto_nudge: Successfully resumed playback")
+    else:
+        print(f"  auto_nudge: No resume needed (was_playing={was_playing}, resume_after={resume_after})")
+
+    # Final position from the current session
+    try:
+        final_timeline = current_session.get_timeline_properties()
+        return final_timeline.position.total_seconds()
+    except Exception:
+        return pos_after_pause
 
 
 def _fetch_lyrics_sync(query):
@@ -234,7 +285,7 @@ async def _refresh_sync_async(app, sleep_delay: float = 0.1):
 async def sync_song(app):
     global current_title, current_artist
     global song_duration, last_system_position, last_sync_time
-    global local_position_at_sync, last_accepted_system_pos
+    global local_position_at_sync, last_accepted_system_pos, last_window_position
     global is_paused, paused_position, is_initialized
     global lyrics_lines
 
@@ -273,7 +324,13 @@ async def sync_song(app):
 
                 if should_initialise:
                     app.root.after(0, lambda: app.update_status("Syncing..."))
-                    new_system_pos = await auto_nudge(session, sleep_delay=0.02, resume_after=False)
+                    new_system_pos = await auto_nudge(session, sleep_delay=0.08, resume_after=True)
+                    if new_system_pos is not None:
+                        system_pos = new_system_pos
+                else:
+                    # On every new song after initialization, refresh the reported position
+                    # and FORCE resume to ensure the timer starts with music playing.
+                    new_system_pos = await auto_nudge(session, sleep_delay=0.08, resume_after=True)
                     if new_system_pos is not None:
                         system_pos = new_system_pos
 
@@ -282,6 +339,7 @@ async def sync_song(app):
                 last_sync_time = time.perf_counter()
                 local_position_at_sync = system_pos
                 last_accepted_system_pos = system_pos
+                last_window_position = system_pos
 
                 query = f"{title} {artist}"
                 lrc_text = await get_synced_lyrics(query)
@@ -338,35 +396,90 @@ async def sync_song(app):
                     )
                     delta_from_last_accepted = system_pos - last_accepted_system_pos
 
-                    is_frozen = (
-                        abs(delta_from_last_accepted) < 0.1
-                        and local_now > last_accepted_system_pos + 2.0
+                    window_updated = (
+                        last_window_position is None
+                        or abs(system_pos - last_window_position) > 0.05
                     )
 
-                    is_significant_change = abs(delta_from_last_accepted) > 0.9
-
-                    if is_frozen:
+                    if not window_updated:
+                        # The system has returned the same window position as the last poll.
+                        # This is expected while the song is playing normally, so keep
+                        # the local timer running and ignore redundant updates.
                         pass
-
-                    elif is_significant_change:
-                        drift_from_local = system_pos - local_now
-                        is_auto_refresh = abs(drift_from_local) <= 3.0
-                        is_user_seek = abs(drift_from_local) > 3.0
-
-                        # Guard against glitch where system_pos becomes 0 while playing
-                        if system_pos < last_accepted_system_pos - 5.0 and local_now > 1.0 and not is_paused:
-                            print(f"Glitch detected: system_pos jumped from {last_accepted_system_pos:.1f}s to {system_pos:.1f}s while local position is {local_now:.1f}s. Ignoring.")
-                            # Position jumped backwards by more than 5s while playing — glitch
-                            pass
-
-                        elif is_auto_refresh or is_user_seek:
-                            last_system_position = system_pos
-                            last_sync_time = time.perf_counter()
-                            local_position_at_sync = system_pos
-                            last_accepted_system_pos = system_pos
 
                     else:
-                        pass
+                        is_frozen = (
+                            abs(delta_from_last_accepted) < 0.1
+                            and local_now > last_accepted_system_pos + 2.0
+                        )
+
+                        is_significant_change = abs(delta_from_last_accepted) > 0.9
+
+                        if is_frozen:
+                            pass
+
+                        elif is_significant_change:
+                            drift_from_local = system_pos - local_now
+                            is_auto_refresh = abs(drift_from_local) <= 3.0
+                            is_user_seek = abs(drift_from_local) > 3.0
+
+                            # Potential backward jump: could be a real user seek (drag/prev)
+                            # or a glitch where system reports 0/near-0 erroneously.
+                            # Verify by nudging the session: if the position after a nudge
+                            # matches the window-reported position, accept it as a user
+                            # action; otherwise treat it as a glitch and ignore.
+                            if (
+                                system_pos < last_accepted_system_pos - 5.0
+                                and local_now > 1.0
+                                and not is_paused
+                            ):
+                                print(f"Possible backward jump: reported {system_pos:.1f}s (last {last_accepted_system_pos:.1f}s). Verifying with nudge...")
+                                try:
+                                    verified_pos = await auto_nudge(session, sleep_delay=0.05, resume_after=True)
+                                except Exception:
+                                    verified_pos = None
+
+                                if verified_pos is None:
+                                    print("Nudge failed — ignoring update")
+                                    # keep running local timer
+                                    pass
+                                else:
+                                    # If nudge returns a position close to the window's value,
+                                    # accept it as a legitimate user seek; otherwise if nudge
+                                    # returns a position near the previous accepted value,
+                                    # treat original report as a glitch and ignore.
+                                    if abs(verified_pos - system_pos) <= 0.5:
+                                        print(f"Verified: user seek to {verified_pos:.1f}s. Accepting.")
+                                        last_system_position = verified_pos
+                                        last_sync_time = time.perf_counter()
+                                        local_position_at_sync = verified_pos
+                                        last_accepted_system_pos = verified_pos
+                                        last_window_position = verified_pos
+                                        system_pos = verified_pos
+                                    else:
+                                        print(f"Nudge returned {verified_pos:.1f}s which differs — treating original as glitch")
+                                        # Update to the verified position if it indicates reality
+                                        if abs(verified_pos - last_accepted_system_pos) > 0.9:
+                                            last_system_position = verified_pos
+                                            last_sync_time = time.perf_counter()
+                                            local_position_at_sync = verified_pos
+                                            last_accepted_system_pos = verified_pos
+                                            last_window_position = verified_pos
+                                            system_pos = verified_pos
+                                        else:
+                                            # Keep local timer running; ignore the spurious report
+                                            pass
+
+                            elif is_auto_refresh or is_user_seek:
+                                last_system_position = system_pos
+                                last_sync_time = time.perf_counter()
+                                local_position_at_sync = system_pos
+                                last_accepted_system_pos = system_pos
+
+                        else:
+                            pass
+
+                last_window_position = system_pos
 
         else:
             app.root.after(0, lambda: app.update_status("No media session"))
