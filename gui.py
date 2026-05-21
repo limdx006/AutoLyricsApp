@@ -42,6 +42,8 @@ class LyricsApp:
         self.lyric_mode = "original"
         self._detected_language = "other"
 
+        self._pinned = False
+
         self._build_window()
         self._build_info_panel()
         self._build_translation_bar()
@@ -152,6 +154,20 @@ class LyricsApp:
 
         self._offset_var = tk.StringVar(value=f"{self.lyric_offset:.1f}")
         self._offset_var.trace_add("write", self._on_offset_var_changed)
+
+        top_button_row = tk.Frame(self.info_frame, bg=ACCENT_COLOR)
+        top_button_row.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        self.pin_btn = tk.Label(
+            top_button_row,
+            text="📌",
+            font=(FONT_FAMILY, 14),
+            bg=ACCENT_COLOR,
+            fg=COLOR_FAR_FG,
+            cursor="hand2",
+        )
+        self.pin_btn.pack(side=tk.RIGHT, padx=(0, 4))
+        self.pin_btn.bind("<Button-1>", lambda e: self._toggle_pin())
 
         self.title_label = tk.Label(
             self.info_frame,
@@ -510,6 +526,12 @@ class LyricsApp:
 
     def set_refresh_callback(self, callback):
         self._refresh_callback = callback
+
+    def _toggle_pin(self):
+        """Toggle always-on-top for the main window."""
+        self._pinned = not self._pinned
+        self.root.attributes("-topmost", self._pinned)
+        self.pin_btn.config(fg=COLOR_ERROR_FG if self._pinned else COLOR_FAR_FG)
 
     def _on_pause_btn_clicked(self):
         if getattr(self, "_pause_callback", None):

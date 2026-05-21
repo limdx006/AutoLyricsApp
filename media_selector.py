@@ -7,7 +7,7 @@ from winsdk.windows.media.control import (
 )
 
 # Toggle to print a scoring breakdown whenever a re-score actually runs
-DEBUG_MEDIA_SELECTOR = True
+DEBUG_MEDIA_SELECTOR = False
 
 """MEDIA SELECTOR - Scores all active Windows media sessions and returns the one
 most likely to be music. This replaces the naive get_current_session() approach,
