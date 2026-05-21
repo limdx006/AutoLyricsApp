@@ -85,19 +85,10 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 3, r
         pass
     await precise_sleep(sleep_delay)
 
-    # ----- After pause, get the current active session -----
+    # ----- After pause, get timeline from the SAME session we paused -----
+    # Do NOT re-fetch from the manager, as that could return a different active session
     try:
-        manager = await MediaManager.request_async()
-        current_session = manager.get_current_session()
-        if not current_session:
-            # Fallback: try to re‑obtain the original session’s equivalent
-            current_session = session
-    except Exception:
-        current_session = session
-
-    # Obtain timeline properties from the current session
-    try:
-        timeline = current_session.get_timeline_properties()
+        timeline = session.get_timeline_properties()
         pos_after_pause = timeline.position.total_seconds()
     except Exception:
         pos_after_pause = 0.0
@@ -110,18 +101,12 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 3, r
         max_attempts = max_retries + 2  # Extra buffer for final fallback attempts
 
         while attempt < max_attempts and not resumed:
-            # Always fetch the freshest session from the manager
+            # Always work on the ORIGINAL session passed in, not a fresh one from the manager
+            # This ensures we resume the correct media player even if another is OS-active
+            
+            # Attempt to resume the original session
             try:
-                manager_fresh = await MediaManager.request_async()
-                work_session = manager_fresh.get_current_session()
-                if not work_session:
-                    work_session = current_session
-            except Exception:
-                work_session = current_session
-
-            # Attempt to resume
-            try:
-                await work_session.try_play_async()
+                await session.try_play_async()
             except Exception as exc:
                 print(f"  auto_nudge: try_play_async() failed on attempt {attempt + 1}: {exc}")
 
@@ -129,19 +114,15 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 3, r
             attempt_delay = sleep_delay * max(1, (attempt // 2) + 1)
             await precise_sleep(attempt_delay)
 
-            # Verify playback status from the freshest session
+            # Verify playback status on the ORIGINAL session
             try:
-                manager_verify = await MediaManager.request_async()
-                verify_session = manager_verify.get_current_session()
-                if verify_session:
-                    info = verify_session.get_playback_info()
-                    if info.playback_status == PlaybackStatus.PLAYING:
-                        resumed = True
-                        current_session = verify_session
-                        print(f"  auto_nudge: Confirmed PLAYING on attempt {attempt + 1}")
-                        break
-                    else:
-                        print(f"  auto_nudge: Status not PLAYING on attempt {attempt + 1}: {info.playback_status}")
+                info = session.get_playback_info()
+                if info.playback_status == PlaybackStatus.PLAYING:
+                    resumed = True
+                    print(f"  auto_nudge: Confirmed PLAYING on attempt {attempt + 1}")
+                    break
+                else:
+                    print(f"  auto_nudge: Status not PLAYING on attempt {attempt + 1}: {info.playback_status}")
             except Exception as exc:
                 print(f"  auto_nudge: Verification check failed on attempt {attempt + 1}: {exc}")
 
@@ -154,9 +135,9 @@ async def auto_nudge(session, sleep_delay: float = 0.05, max_retries: int = 3, r
     else:
         print(f"  auto_nudge: No resume needed (was_playing={was_playing}, resume_after={resume_after})")
 
-    # Final position from the current session
+    # Final position from the ORIGINAL session
     try:
-        final_timeline = current_session.get_timeline_properties()
+        final_timeline = session.get_timeline_properties()
         return final_timeline.position.total_seconds()
     except Exception:
         return pos_after_pause
