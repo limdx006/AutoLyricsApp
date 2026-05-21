@@ -60,6 +60,7 @@ A real-time desktop lyrics player built with Python that detects the currently p
 - **Progress bar** — live red fill with current and total time flanking the controls
 - **Refresh button (⟳)** — manually triggers a re-sync nudge mid-song
 - **Settings button (⚙)** — opens a preferences window to adjust window size and lyric font size
+- **Pin-to-top button (📌)** — toggles always-on-top mode so the window stays above other apps; icon turns red when active, dimmed when off
 - **Status indicator** — shows Initialising / Syncing / Loading lyrics / Ready / Paused / Playing
 - **"No lyrics found" message** when no LRC data is available for a track
 
@@ -105,7 +106,13 @@ Classifies each incoming system position as one of:
 - **User seek** — large drift from local estimate (>3s) → accept and resync
 
 ### Auto-Nudge
-On first run, Windows often reports a stale or zero timeline position. The app sends a pause, then an immediate resume command — using the same media session object throughout — to force Windows to flush the real current position before loading lyrics.
+On first launch and on every new song detection, Windows often reports a stale or zero timeline position. To fix this, the app sends a pause command followed by a resume command to force Windows to flush the real current playback position before lyrics are loaded and synced.
+
+The nudge runs **twice** — once on first launch (to resolve the 0:00 startup bug), and again on every subsequent song change (to ensure the position is accurate before lyrics load).
+
+**Resume reliability:** After pausing, the app re-fetches the active session from Windows and retries `try_play_async()` up to 5 times with increasing delays, verifying playback status after each attempt. If all attempts fail, music may remain paused — pressing play manually or using the ⟳ refresh button will recover.
+
+**Backward jump verification:** If Windows suddenly reports a position significantly earlier than expected (e.g. a glitch reporting near 0:00 mid-song), the app fires a nudge to verify the real position before accepting the change. If the nudge confirms the jump was a genuine user seek, it is accepted; if the nudge returns a position close to where the local timer was, the report is treated as a glitch and ignored.
 
 ---
 
@@ -121,7 +128,7 @@ On first run, Windows often reports a stale or zero timeline position. The app s
 - **Windows only** — requires Windows 10 or 11
 - The media player must expose system media controls (Spotify, browsers, etc.)
 - Lyrics availability depends on the `syncedlyrics` library — some songs may have no or wrong LRC data
-- The auto-nudge causes a very brief (~50ms) stutter on first launch to force a position sync — if the music stops, press play or use the ⟳ refresh button to re-sync manually
+- **Auto-nudge on every song change** — the app performs a pause/resume cycle on startup and on each new song to force Windows to report the correct playback position (fixes the 0:00 sync bug). The resume is retried up to 5 times with verification. In rare cases where all retries fail, music may remain paused — press play manually or use the ⟳ refresh button to recover
 - **Use YouTube Music instead of YouTube** — YouTube Music lyrics tend to sync more accurately with the app, likely because the `syncedlyrics` library has better LRC data for it. Standard YouTube may have off-sync or missing lyrics
 
 ---
