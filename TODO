@@ -1,6 +1,5 @@
 # Planned
-- [ ] Pin to top feature
-- [ ] Auto refresh after featching and display the lyrics
+
 
 # Bug 
 
@@ -12,3 +11,5 @@
 - [x] Manual sync timing (remember song that needed manual modification)
 - [x] Translation (Japanese to Roma/Chinese to Pinyin)
 - [x] Editable font size and window size
+- [x] Pin to top feature
+- [x] Auto refresh after featching and display the lyrics

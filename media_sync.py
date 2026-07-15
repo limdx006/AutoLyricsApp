@@ -254,21 +254,17 @@ async def _refresh_sync_async(app, sleep_delay: float = 0.1):
     new_system_pos = await auto_nudge(session, sleep_delay=sleep_delay, resume_after=True)
 
     if new_system_pos is not None:
-        global last_system_position, last_sync_time, local_position_at_sync, last_accepted_system_pos
+        global last_system_position, last_sync_time, local_position_at_sync, last_accepted_system_pos, is_paused
         last_system_position = new_system_pos
         last_sync_time = time.perf_counter()
         local_position_at_sync = new_system_pos
         last_accepted_system_pos = new_system_pos
 
-    app.root.after(0, lambda: app.update_status("Ready"))
-
 
 async def sync_song(app):
-    global current_title, current_artist
-    global song_duration, last_system_position, last_sync_time
+    global current_title, current_artist, song_duration, last_system_position, last_sync_time
     global local_position_at_sync, last_accepted_system_pos, last_window_position
-    global is_paused, paused_position, is_initialized
-    global lyrics_lines
+    global is_paused, paused_position, is_initialized, lyrics_lines
 
     while True:
         session, info, score = await get_best_session()
@@ -348,26 +344,29 @@ async def sync_song(app):
                 app.root.after(
                     0, lambda l=lyrics_snapshot, i=start_index: app.load_lyrics(l, i)
                 )
+                # Update pause button to reflect current playback state
+                app.root.after(0, lambda: app.set_pause_button_state(not is_paused))
                 app.root.after(0, lambda: app.update_status("Ready"))
 
             else:
-                if not currently_playing and not is_paused:
-                    is_paused = True
-                    paused_position = local_position_at_sync + (
-                        time.perf_counter() - last_sync_time
-                    )
-                    app.root.after(0, lambda: app.update_status("Paused"))
-                    app.root.after(0, lambda: app.set_pause_button_state(True))
-
-                elif currently_playing and is_paused:
-                    is_paused = False
-                    last_system_position = system_pos
-                    last_sync_time = time.perf_counter()
-                    local_position_at_sync = system_pos
-                    last_accepted_system_pos = system_pos
+                # Update pause button state based on actual playback status
+                if currently_playing:
+                    if is_paused:
+                        is_paused = False
+                        last_system_position = system_pos
+                        last_sync_time = time.perf_counter()
+                        local_position_at_sync = system_pos
+                        last_accepted_system_pos = system_pos
                     app.root.after(0, lambda: app.update_status("Playing"))
                     app.root.after(0, lambda: app.set_pause_button_state(False))
-                    continue
+                else:
+                    if not is_paused:
+                        is_paused = True
+                        paused_position = local_position_at_sync + (
+                            time.perf_counter() - last_sync_time
+                        )
+                    app.root.after(0, lambda: app.update_status("Paused"))
+                    app.root.after(0, lambda: app.set_pause_button_state(True))
 
                 if is_paused or not is_initialized:
                     pass
@@ -469,8 +468,7 @@ async def sync_song(app):
 
 
 async def progress_clock(app):
-    global local_position_at_sync, last_sync_time, is_paused, paused_position, is_initialized
-    global lyrics_lines
+    global local_position_at_sync, last_sync_time, is_paused, paused_position, is_initialized, lyrics_lines
 
     last_print = -1
     last_lyric_idx = -1
