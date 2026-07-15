@@ -361,6 +361,7 @@ class LyricsApp:
 
         for i, weight in enumerate([0, 1, 0, 0, 0, 1, 0]):
             self.progress_frame.grid_columnconfigure(i, weight=weight)
+        self.progress_frame.grid_rowconfigure(0, minsize=56)
 
         self.current_time_label = tk.Label(
             self.progress_frame,
@@ -377,11 +378,23 @@ class LyricsApp:
         )
         self.prev_btn.grid(row=0, column=2, padx=10)
 
-        self.pause_btn = self._make_clickable_label(
-            self.progress_frame, "▌▌", 14,
-            click_handler=lambda e: self._on_pause_btn_clicked()
+        self.pause_btn_frame = tk.Frame(self.progress_frame, bg=BG_COLOR, width=48, height=48)
+        self.pause_btn_frame.grid(row=0, column=3, padx=10)
+        self.pause_btn_frame.grid_propagate(False)
+
+        self.pause_btn = tk.Label(
+            self.pause_btn_frame,
+            text="▌▌",
+            font=(FONT_FAMILY, 14),
+            bg=BG_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            cursor="hand2",
+            anchor="center",
+            justify=tk.CENTER,
         )
-        self.pause_btn.grid(row=0, column=3, padx=10)
+        self.pause_btn.pack(fill=tk.BOTH, expand=True)
+        self.pause_btn.bind("<Button-1>", lambda e: self._on_pause_btn_clicked())
+        self._bind_hover(self.pause_btn)
 
         self.next_btn = self._make_clickable_label(
             self.progress_frame, "▶▶", 20,
