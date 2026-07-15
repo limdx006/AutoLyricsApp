@@ -3,4 +3,4 @@ API.py
 .pyc
 /build/LyricsPlayer
 LyricsPlayer.spec
-/.claude
+/dist
