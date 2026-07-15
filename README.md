@@ -47,7 +47,7 @@ A real-time desktop lyrics player built with Python that detects the currently p
 - Auto-detects the song language from the lyrics text
 - A **translation bar** below the info panel shows the detected language, current display mode, and toggle buttons
 - Supports three languages with one-click romanisation:
-  - 🇯🇵 **Japanese** → Romaji (Hepburn), powered by `cutlet` + `pykakasi` fallback
+  - 🇯🇵 **Japanese** → Romaji (Hepburn), powered by `cutlet` fallback
   - 🇨🇳 **Chinese** → Pinyin with tone marks, powered by `pypinyin`
   - 🇰🇷 **Korean** → Romaja (Revised Romanisation), powered by `korean-romanizer`
 - Toggle buttons only appear when the detected language supports translation — no clutter for English or other songs
