@@ -18,3 +18,23 @@ import tkinter as tk
 import os
 import sys
 
+from lyrics_fetcher import lyrics_fetcher
+from media_detect import detect_media
+
+
+
+async def main():
+    print("*****************************************************************")
+    print("Welcome to LyricsPlayer - Auto-synced lyrics display application.")
+    print("*****************************************************************")
+
+    title, artist = await detect_media()
+    lyrics_fetcher(title, artist)
+
+    print("****************************************************")
+    print("Exit successfully, Thank you for using LyricsPlayer. ")
+    print("****************************************************")
+        
+
+if __name__ == "__main__":
+    asyncio.run(main())
