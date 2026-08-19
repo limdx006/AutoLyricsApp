@@ -45,6 +45,8 @@ _BLACKLISTED_APPS = {
     "mpc-hc",
     "vlc",
     "wmplayer",
+    "riot", 
+    "douyin",
 }
 
 _MUSIC_APP_ALLOWLIST = {
@@ -59,6 +61,7 @@ _MUSIC_APP_ALLOWLIST = {
     "amazon music",
     "deezer",
     "soundcloud",
+    "ytmusic",
 }
 
 _BROWSER_APPS = {"chrome", "msedge", "firefox", "opera", "brave", "vivaldi"}
