@@ -22,7 +22,7 @@ class MediaDetails(tk.Frame):
 
         # Left column: Log button (row0) and Refresh button (row1)
         self.log_button = self.create_button("\U0001F4DD", 0, 0, sticky="n")   # 📝 is U+1F4DD
-        self.refresh_button = self.create_button("\u27F3", 1, 0,font_size=18, sticky="n")   # ⟳ is U+27F3
+        self.refresh_button = self.create_button("\u27F3", 1, 0, font_size=18, sticky="n")   # ⟳ is U+27F3
 
         # Middle column: Song name and artist name (stacked vertically)
         middle_frame = tk.Frame(self, bg=ACCENT_COLOR)
@@ -52,10 +52,13 @@ class MediaDetails(tk.Frame):
         self.settings_button = self.create_button("\u2699", 1, 2, sticky="n")   # ⚙ is U+2699
 
     def create_button(self, symbol, row, column, font_size=16, sticky="nsew"):
-        button = tk.Label(self, text=symbol, bg=ACCENT_COLOR, fg=COLOR_ACTIVE_FG, font=(FONT_FAMILY, font_size))
+        button = tk.Button(
+            self, text=symbol, bg=ACCENT_COLOR, fg=COLOR_ACTIVE_FG,
+            font=(FONT_FAMILY, font_size), borderwidth=0, relief=tk.FLAT,
+            highlightthickness=0, activebackground="#1e2e4a",
+            activeforeground=COLOR_ACTIVE_FG
+        )
         button.grid(row=row, column=column, padx=10, pady=10, sticky=sticky)
-        button.bind("<Enter>", lambda e: e.widget.configure(bg="#1e2e4a"))  # slightly lighter on hover
+        button.bind("<Enter>", lambda e: e.widget.configure(bg="#1e2e4a"))
         button.bind("<Leave>", lambda e: e.widget.configure(bg=ACCENT_COLOR))
-        button.bind("<Button-1>", lambda e: e.widget.configure(bg=ACCENT_COLOR))  # visual feedback on click
-        button.bind("<ButtonRelease-1>", lambda e: e.widget.configure(bg="#1e2e4a"))  # back to hover color after click
         return button
