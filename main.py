@@ -20,6 +20,7 @@ import sys
 
 from lyrics_fetcher import lyrics_fetcher
 from media_detect import detect_media
+from gui import LyricsApp
 
 
 
@@ -30,6 +31,11 @@ async def main():
 
     title, artist = await detect_media()
     lyrics_fetcher(title, artist)
+
+    # Display the GUI
+    root = tk.Tk()
+    app = LyricsApp(root)
+    root.mainloop()
 
     print("****************************************************")
     print("Exit successfully, Thank you for using LyricsPlayer. ")
