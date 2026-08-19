@@ -8,8 +8,8 @@ class ControlsPanel(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
 
-        # Fixed height = 30% of window height
-        self.configure(height=int(WINDOW_HEIGHT * 0.3))
+        # Fixed height = 20% of window height
+        self.configure(height=int(WINDOW_HEIGHT * 0.2))
         self.pack_propagate(False)  # prevent shrinking to fit contents
 
         # 3 rows: timeline, buttons, status
@@ -22,7 +22,7 @@ class ControlsPanel(tk.Frame):
         self._build_buttons()
         self._build_status()
 
-    # Construction helpers
+    """Construction helpers"""
     def _build_timeline(self):
         self.timeline_canvas = tk.Canvas(
             self, bg=ACCENT_COLOR, highlightthickness=1,
@@ -78,7 +78,7 @@ class ControlsPanel(tk.Frame):
         )
         self.status_label.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
 
-    # Behavior
+    """Behavior"""
     def on_timeline_configure(self, event):
         self.draw_timeline_progress(0.50)
 
