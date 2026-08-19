@@ -29,8 +29,8 @@ async def main():
     print("Welcome to LyricsPlayer - Auto-synced lyrics display application.")
     print("*****************************************************************")
 
-    title, artist = await detect_media()
-    lyrics_fetcher(title, artist)
+    # title, artist = await detect_media()
+    # lyrics_fetcher(title, artist)
 
     # Display the GUI
     root = tk.Tk()
