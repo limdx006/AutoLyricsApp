@@ -111,3 +111,8 @@ class MediaDetails(tk.Frame):
             self.pin_button.configure(fg=ERROR_COLOR)
         else:
             self.pin_button.configure(fg=COLOR_ACTIVE_FG)
+
+    def update_song_info(self, title, artist):
+        """Update the displayed song title and artist."""
+        self.song_name_label.config(text=title)
+        self.artist_name_label.config(text=artist)

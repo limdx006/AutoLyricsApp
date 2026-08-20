@@ -2,7 +2,7 @@ import tkinter as tk
 import asyncio
 import threading
 from config import *
-from media_detect import get_media_position, get_playback_status, control_play, control_pause, control_next, control_previous
+from media_detect import get_media_position, get_playback_status, control_play, control_pause, control_next, control_previous, get_media_info
 from time_formatter import format_display_time
 from local_timer import LocalTimer
 
@@ -10,7 +10,7 @@ from local_timer import LocalTimer
 class ControlsPanel(tk.Frame):
     """Bottom section of the player: timeline, transport buttons, and status label."""
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, on_song_change=None, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
 
         # Fixed height = 20% of window height
@@ -28,6 +28,10 @@ class ControlsPanel(tk.Frame):
         self._last_windows_position = -1.0
         self._last_total_duration = 0.0
         self._has_synced = False
+        # Song info tracking
+        self._last_title = ""
+        self._last_artist = ""
+        self._on_song_change = on_song_change
 
         self._build_timeline()
         self._build_buttons()
@@ -128,23 +132,35 @@ class ControlsPanel(tk.Frame):
         )
 
     def _fetch_windows_loop(self):
-        """Slow loop: fetch position from Windows media session every 500ms."""
+        """Slow loop: fetch position and media info from Windows media session every 500ms."""
         def fetch():
             try:
                 position, total = asyncio.run(get_media_position())
+                title, artist = asyncio.run(get_media_info())
             except Exception:
                 position, total = 0.0, 0.0
+                title, artist = "Undetected Song", "Unknown Artist"
             # Schedule processing on main thread
-            self.after(0, lambda: self._process_windows_update(position, total))
+            self.after(0, lambda: self._process_windows_update(position, total, title, artist))
         threading.Thread(target=fetch, daemon=True).start()
         self.after(500, self._fetch_windows_loop)
 
-    def _process_windows_update(self, position, total):
-        """Process the position/duration from Windows media session."""
+    def _process_windows_update(self, position, total, title, artist):
+        """Process the position/duration/media info from Windows media session."""
         # Update total duration if it changed
         if total != self._last_total_duration:
             self._last_total_duration = total
             self.total_duration_label.config(text=format_display_time(total))
+
+        # Check for song change
+        if title != self._last_title or artist != self._last_artist:
+            previous_title = self._last_title
+            previous_artist = self._last_artist
+            self._last_title = title
+            self._last_artist = artist
+            print(f"[Session] Detected song update {title} by {artist}")
+            if self._on_song_change:
+                self._on_song_change(title, artist)
 
         # If position changed (user action or natural progression), sync local timer
         if position != self._last_windows_position:

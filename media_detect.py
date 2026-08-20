@@ -39,6 +39,19 @@ async def get_playback_status():
     except Exception:
         return "stopped"
 
+async def get_media_info():
+    """Return current song title and artist."""
+    target = await _get_target_session()
+    if not target:
+        return "Undetected Song", "Unknown Artist"
+    try:
+        info = await target.try_get_media_properties_async()
+        title = info.title if info.title else "Undetected Song"
+        artist = info.artist if info.artist else "Unknown Artist"
+        return title, artist
+    except Exception:
+        return "Undetected Song", "Unknown Artist"
+
 async def control_play():
     """Resume playback."""
     target = await _get_target_session()

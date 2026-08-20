@@ -35,5 +35,8 @@ class LyricsApp:
         )
 
         # Controls (bottom 25%)
-        self.controls = ControlsPanel(self.root)
+        self.controls = ControlsPanel(
+            self.root,
+            on_song_change=lambda t, a: self.media_details.update_song_info(t, a)
+        )
         self.controls.pack(side=tk.BOTTOM, fill=tk.X)
