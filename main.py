@@ -23,7 +23,6 @@ from media_detect import detect_media
 from gui import LyricsApp
 
 
-
 async def main():
     print("*****************************************************************")
     print("Welcome to LyricsPlayer - Auto-synced lyrics display application.")
@@ -41,7 +40,7 @@ async def main():
     print("****************************************************")
     print("Exit successfully, Thank you for using LyricsPlayer. ")
     print("****************************************************")
-        
+
 
 if __name__ == "__main__":
     asyncio.run(main())

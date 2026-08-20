@@ -23,10 +23,14 @@ class ControlsPanel(tk.Frame):
         self._build_status()
 
     """Construction helpers"""
+
     def _build_timeline(self):
         self.timeline_canvas = tk.Canvas(
-            self, bg=ACCENT_COLOR, highlightthickness=1,
-            highlightbackground="black", height=5
+            self,
+            bg=ACCENT_COLOR,
+            highlightthickness=1,
+            highlightbackground="black",
+            height=5,
         )
         self.timeline_canvas.grid(row=0, column=0, sticky="ew", padx=26, pady=4)
         self.timeline_canvas.bind("<Configure>", self.on_timeline_configure)
@@ -40,32 +44,44 @@ class ControlsPanel(tk.Frame):
             button_frame.grid_columnconfigure(col, weight=weight)
 
         self.current_time_label = tk.Label(
-            button_frame, text="00:30", bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
-            font=(FONT_FAMILY, 10)
+            button_frame,
+            text="00:30",
+            bg=BG_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            font=(FONT_FAMILY, 10),
         )
         self.current_time_label.grid(row=0, column=0, padx=2)
 
-        self.prev_button = self._make_transport_button(button_frame, "\u23EE")
+        self.prev_button = self._make_transport_button(button_frame, "\u23ee")
         self.prev_button.grid(row=0, column=2, padx=5)
 
-        self.play_pause_button = self._make_transport_button(button_frame, "\u23F8")
+        self.play_pause_button = self._make_transport_button(button_frame, "\u23f8")
         self.play_pause_button.grid(row=0, column=3, padx=5, pady=4)
 
-        self.next_button = self._make_transport_button(button_frame, "\u23ED")
+        self.next_button = self._make_transport_button(button_frame, "\u23ed")
         self.next_button.grid(row=0, column=4, padx=5)
 
         self.total_duration_label = tk.Label(
-            button_frame, text="04:33", bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
-            font=(FONT_FAMILY, 10)
+            button_frame,
+            text="04:33",
+            bg=BG_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            font=(FONT_FAMILY, 10),
         )
         self.total_duration_label.grid(row=0, column=6, padx=2)
 
     def _make_transport_button(self, parent, symbol):
         btn = tk.Button(
-            parent, text=symbol, bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
-            font=(FONT_FAMILY, 18), borderwidth=0, relief=tk.FLAT,
-            highlightthickness=0, activebackground="#24243e",
-            activeforeground=COLOR_ACTIVE_FG
+            parent,
+            text=symbol,
+            bg=BG_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            font=(FONT_FAMILY, 18),
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            activebackground="#24243e",
+            activeforeground=COLOR_ACTIVE_FG,
         )
         btn.bind("<Enter>", lambda e: e.widget.configure(bg="#24243e"))
         btn.bind("<Leave>", lambda e: e.widget.configure(bg=BG_COLOR))
@@ -73,12 +89,12 @@ class ControlsPanel(tk.Frame):
 
     def _build_status(self):
         self.status_label = tk.Label(
-            self, text="status", bg=BG_COLOR, fg=COLOR_STATUS_FG,
-            font=(FONT_FAMILY, 10)
+            self, text="status", bg=BG_COLOR, fg=COLOR_STATUS_FG, font=(FONT_FAMILY, 10)
         )
         self.status_label.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
 
     """Behavior"""
+
     def on_timeline_configure(self, event):
         self.draw_timeline_progress(0.50)
 

@@ -4,6 +4,7 @@ from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
 
+
 async def detect_media():
     """Detect and list all active media sessions from Windows."""
     sessions = await MediaManager.request_async()
@@ -34,14 +35,19 @@ async def detect_media():
     for i, session in enumerate(all_sessions):
         session_info = await session.try_get_media_properties_async()
         timeline = session.get_timeline_properties()
-        is_current = (session == current_session)
-        print(f"--- Session #{i + 1} {'[CURRENT/ACTIVE]' if is_current else '[BACKGROUND]'} ---")
+        is_current = session == current_session
+        print(
+            f"--- Session #{i + 1} {'[CURRENT/ACTIVE]' if is_current else '[BACKGROUND]'} ---"
+        )
         print(f"  Title:    {session_info.title or 'Undetected Song'}")
         print(f"  Artist:   {session_info.artist or 'Unknown Artist'}")
-        print(f"  Position: {timeline.position.total_seconds():.1f}s / {timeline.end_time.total_seconds():.1f}s")
+        print(
+            f"  Position: {timeline.position.total_seconds():.1f}s / {timeline.end_time.total_seconds():.1f}s"
+        )
         print(f"  Source:   {session.source_app_user_model_id or 'Unknown'}")
 
     return title, artist
+
 
 if __name__ == "__main__":
     asyncio.run(detect_media())

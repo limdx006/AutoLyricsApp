@@ -8,11 +8,13 @@ r"""
   howpublished = {\url{https://github.com/moehmeni/syncedlyrics}},
 }
 """
+
 import time
 import syncedlyrics
 import re
 
 MAX_ATTEMPT = 3
+
 
 def remove_empty_lines(lyrics: str) -> str:
     """
@@ -25,7 +27,6 @@ def remove_empty_lines(lyrics: str) -> str:
         if not empty_pattern.match(line):
             cleaned_lines.append(line)
     return "\n".join(cleaned_lines)
-
 
 
 def lyrics_fetcher(title, artist):
@@ -43,7 +44,6 @@ def lyrics_fetcher(title, artist):
             print(f"Attempt {attempt + 1} failed for '{query}': {e}")
             if attempt < MAX_ATTEMPT - 1:
                 time.sleep(1)  # Wait for 1 second before retrying
-
 
 
 if __name__ == "__main__":
