@@ -3,6 +3,7 @@ from tkinter import font as tkfont
 from config import *
 from gui_controls_panel import ControlsPanel
 from gui_media_details import MediaDetails
+from gui_language_bar import LanguageBar
 
 class LyricsApp:
     def __init__(self, root):
@@ -16,8 +17,7 @@ class LyricsApp:
         self.media_details.pack(side=tk.TOP, fill=tk.X)
 
         # Language bar area (10% below media details area)
-        self.language_bar = tk.Frame(self.root, bg=BG_COLOR, height=int(WINDOW_HEIGHT * 0.1))
-        self.language_bar.pack_propagate(False)
+        self.language_bar = LanguageBar(self.root)
         self.language_bar.pack(side=tk.TOP, fill=tk.X)
 
         # Lyrics display area (expanding middle section)

@@ -10,6 +10,8 @@ class MediaDetails(tk.Frame):
         # Fixed height = 30% of window height
         self.configure(height=int(WINDOW_HEIGHT * 0.3))
         self.pack_propagate(False) # prevent content shrinking
+        # Add margin around the frame when packed
+        self.pack_configure(padx=10, pady=5)
 
         # Configure grid: 2 rows, 3 columns
         self.grid_rowconfigure(0, weight=3)   # first row (takes more space for potential wrapping)
