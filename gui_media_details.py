@@ -51,6 +51,8 @@ class MediaDetails(tk.Frame):
 
         # Right column: Pin button (row0) and Settings button (row1)
         self.pin_button = self.create_button("\U0001F4CC", 0, 2, sticky="n")   # 📌 is U+1F4CC
+        self.pin_button.configure(command=self._toggle_pin_top)
+        self.is_pinned = False
         self.settings_button = self.create_button("\u2699", 1, 2, sticky="n")   # ⚙ is U+2699
 
     def create_button(self, symbol, row, column, font_size=16, sticky="nsew"):
@@ -64,3 +66,13 @@ class MediaDetails(tk.Frame):
         button.bind("<Enter>", lambda e: e.widget.configure(bg="#1e2e4a"))
         button.bind("<Leave>", lambda e: e.widget.configure(bg=ACCENT_COLOR))
         return button
+
+    def _toggle_pin_top(self):
+        """Toggle pin-to-top state and update pin button icon colour."""
+        self.is_pinned = not self.is_pinned
+        top = self.winfo_toplevel()
+        top.attributes("-topmost", self.is_pinned)
+        if self.is_pinned:
+            self.pin_button.configure(fg=ERROR_COLOR)
+        else:
+            self.pin_button.configure(fg=COLOR_ACTIVE_FG)

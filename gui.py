@@ -10,8 +10,9 @@ class LyricsApp:
         self.root = root
         self.root.title("Lyrics Player")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+        self.root.resizable(False, False)
         self.root.configure(bg=BG_COLOR)
-
+        
         # Media details area (top 30%)
         self.media_details = MediaDetails(self.root)
         self.media_details.pack(side=tk.TOP, fill=tk.X)
