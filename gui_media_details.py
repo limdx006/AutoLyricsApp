@@ -4,7 +4,7 @@ from config import *
 class MediaDetails(tk.Frame):
     """Top section of the player: Media name, artist and multiple feature buttons"""
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, title="Song name here", artist="artist name", **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
 
         # Fixed height = 30% of window height
@@ -33,12 +33,14 @@ class MediaDetails(tk.Frame):
         middle_frame.grid_rowconfigure(1, weight=1)   # artist name row
         middle_frame.grid_columnconfigure(0, weight=1)   # middle column expands
 
-        self.song_name_label = tk.Label(middle_frame, text="Song name here",
+        self.song_name_label = tk.Label(middle_frame, text=title,
                                         font=(FONT_FAMILY, 16, "bold"),
-                                        bg=ACCENT_COLOR, fg=COLOR_ACTIVE_FG)
+                                        bg=ACCENT_COLOR, fg=COLOR_ACTIVE_FG,
+                                        wraplength=int(WINDOW_WIDTH * 0.65),
+                                        justify="center")
         self.song_name_label.grid(row=0, column=0, sticky="")  # centered
 
-        self.artist_name_label = tk.Label(middle_frame, text="artist name",
+        self.artist_name_label = tk.Label(middle_frame, text=artist,
                                           font=(FONT_FAMILY, 10),
                                           bg=ACCENT_COLOR, fg=COLOR_NEARBY_FG)
         self.artist_name_label.grid(row=1, column=0, sticky="")  # centered

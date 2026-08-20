@@ -15,24 +15,33 @@ async def detect_media():
 
     if not all_sessions:
         print("No media sessions detected.")
-        return
+        return "Undetected Song", "Unknown Artist"
 
     current_session = sessions.get_current_session()
+    info = None
 
+    # If there is a current session, use its info
+    if current_session:
+        info = await current_session.try_get_media_properties_async()
+    else:
+        # Otherwise, use the first session's info
+        info = await all_sessions[0].try_get_media_properties_async()
+
+    title = info.title if info.title else "Undetected Song"
+    artist = info.artist if info.artist else "Unknown Artist"
+
+    # Print all sessions for debugging
     for i, session in enumerate(all_sessions):
-        info = await session.try_get_media_properties_async()
+        session_info = await session.try_get_media_properties_async()
         timeline = session.get_timeline_properties()
-
-        # Check if this is the "current" (active) session
         is_current = (session == current_session)
-
         print(f"--- Session #{i + 1} {'[CURRENT/ACTIVE]' if is_current else '[BACKGROUND]'} ---")
-        print(f"  Title:    {info.title or 'N/A'}")
-        print(f"  Artist:   {info.artist or 'N/A'}")
+        print(f"  Title:    {session_info.title or 'Undetected Song'}")
+        print(f"  Artist:   {session_info.artist or 'Unknown Artist'}")
         print(f"  Position: {timeline.position.total_seconds():.1f}s / {timeline.end_time.total_seconds():.1f}s")
         print(f"  Source:   {session.source_app_user_model_id or 'Unknown'}")
 
-    return info.title, info.artist
+    return title, artist
 
 if __name__ == "__main__":
     asyncio.run(detect_media())

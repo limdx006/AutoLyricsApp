@@ -6,15 +6,15 @@ from gui_media_details import MediaDetails
 from gui_language_bar import LanguageBar
 
 class LyricsApp:
-    def __init__(self, root):
+    def __init__(self, root, title="Song name here", artist="artist name"):
         self.root = root
         self.root.title("Lyrics Player")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(False, False)
         self.root.configure(bg=BG_COLOR)
-        
+
         # Media details area (top 30%)
-        self.media_details = MediaDetails(self.root)
+        self.media_details = MediaDetails(self.root, title, artist)
         self.media_details.pack(side=tk.TOP, fill=tk.X)
 
         # Language bar area (10% below media details area)
