@@ -2,7 +2,7 @@ import tkinter as tk
 import asyncio
 import threading
 from config import *
-from media_detect import get_media_position
+from media_detect import get_media_position, get_playback_status, control_play, control_pause, control_next, control_previous
 from time_formatter import format_display_time
 from local_timer import LocalTimer
 
@@ -68,12 +68,15 @@ class ControlsPanel(tk.Frame):
 
         self.prev_button = self._make_transport_button(button_frame, "\u23ee")
         self.prev_button.grid(row=0, column=2, padx=5)
+        self.prev_button.configure(command=self._on_previous)
 
-        self.play_pause_button = self._make_transport_button(button_frame, "\u23f8")
+        self.play_pause_button = self._make_transport_button(button_frame, "\u23f8") # \u23f8(pause) \u25B6(play)
         self.play_pause_button.grid(row=0, column=3, padx=5, pady=4)
+        self.play_pause_button.configure(command=self._on_play_pause)
 
         self.next_button = self._make_transport_button(button_frame, "\u23ed")
         self.next_button.grid(row=0, column=4, padx=5)
+        self.next_button.configure(command=self._on_next)
 
         self.total_duration_label = tk.Label(
             button_frame,
@@ -173,3 +176,38 @@ class ControlsPanel(tk.Frame):
         self.current_time_label.config(text=format_display_time(position))
         progress = (position / total) if total > 0 else 0.0
         self.draw_timeline_progress(progress)
+
+    def _on_previous(self):
+        """Handle previous track button click."""
+        def run():
+            try:
+                asyncio.run(control_previous())
+            except Exception as e:
+                print(f"Previous track failed: {e}")
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_next(self):
+        """Handle next track button click."""
+        def run():
+            try:
+                asyncio.run(control_next())
+            except Exception as e:
+                print(f"Next track failed: {e}")
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_play_pause(self):
+        """Handle play/pause button click - checks current status and toggles."""
+        def run():
+            try:
+                status = asyncio.run(get_playback_status())
+                if status == "playing":
+                    asyncio.run(control_pause())
+                    new_symbol = "\u25B6"  # play symbol
+                else:
+                    asyncio.run(control_play())
+                    new_symbol = "\u23f8"  # pause symbol
+                # Update button symbol on main thread
+                self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
+            except Exception as e:
+                print(f"Play/pause failed: {e}")
+        threading.Thread(target=run, daemon=True).start()

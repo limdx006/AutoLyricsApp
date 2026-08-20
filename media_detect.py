@@ -4,18 +4,64 @@ from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 )
 
-async def get_media_position():
-    """Return the current playback position and total duration in seconds."""
+async def _get_target_session():
+    """Helper to get the current or first available media session."""
     sessions = await MediaManager.request_async()
     all_sessions = sessions.get_sessions()
     if not all_sessions:
-        return 0.0, 0.0
+        return None
     current_session = sessions.get_current_session()
-    target = current_session if current_session else all_sessions[0]
+    return current_session if current_session else all_sessions[0]
+
+async def get_media_position():
+    """Return the current playback position and total duration in seconds."""
+    target = await _get_target_session()
+    if not target:
+        return 0.0, 0.0
     timeline = target.get_timeline_properties()
     position = timeline.position.total_seconds()
     total = timeline.end_time.total_seconds()
     return position, total
+
+async def get_playback_status():
+    """Return the current playback status as a string: 'playing', 'paused', or 'stopped'."""
+    target = await _get_target_session()
+    if not target:
+        return "stopped"
+    try:
+        status = target.get_playback_info().playback_status
+        if status == PlaybackStatus.PLAYING:
+            return "playing"
+        elif status == PlaybackStatus.PAUSED:
+            return "paused"
+        else:
+            return "stopped"
+    except Exception:
+        return "stopped"
+
+async def control_play():
+    """Resume playback."""
+    target = await _get_target_session()
+    if target:
+        await target.try_play_async()
+
+async def control_pause():
+    """Pause playback."""
+    target = await _get_target_session()
+    if target:
+        await target.try_pause_async()
+
+async def control_next():
+    """Skip to next track."""
+    target = await _get_target_session()
+    if target:
+        await target.try_skip_next_async()
+
+async def control_previous():
+    """Skip to previous track."""
+    target = await _get_target_session()
+    if target:
+        await target.try_skip_previous_async()
 
 async def detect_media():
     """Detect and list all active media sessions from Windows."""
