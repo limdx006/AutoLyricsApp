@@ -1,5 +1,7 @@
 import tkinter as tk
 from config import *
+from auto_nudge import trigger_auto_nudge
+
 
 
 class MediaDetails(tk.Frame):
@@ -32,6 +34,7 @@ class MediaDetails(tk.Frame):
         self.refresh_button = self.create_button(
             "\u27f3", 1, 0, font_size=18, sticky="n"
         )  # ⟳ is U+27F3
+        self.refresh_button.configure(command=trigger_auto_nudge)
 
         # Middle column: Song name and artist name (stacked vertically)
         middle_frame = tk.Frame(self, bg=ACCENT_COLOR)
