@@ -4,6 +4,7 @@ import threading
 from config import *
 from media_detect import get_media_position
 from time_formatter import format_display_time
+from local_timer import LocalTimer
 
 
 class ControlsPanel(tk.Frame):
@@ -22,11 +23,18 @@ class ControlsPanel(tk.Frame):
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        # Hybrid timer state
+        self._local_timer = LocalTimer()
+        self._last_windows_position = -1.0
+        self._last_total_duration = 0.0
+        self._has_synced = False
+
         self._build_timeline()
         self._build_buttons()
         self._build_status()
-        # start periodic timeline updates
-        self.after(0, self._update_timeline_loop)
+        # Start the two update loops
+        self.after(0, self._fetch_windows_loop)   # slow: fetch from Windows every 500ms
+        self.after(0, self._update_ui_loop)       # fast: update UI from local timer every 100ms
 
     """Construction helpers"""
 
@@ -102,7 +110,8 @@ class ControlsPanel(tk.Frame):
     """Behavior"""
 
     def on_timeline_configure(self, event):
-        self.draw_timeline_progress(0.0)
+        # Initial draw will be handled by _update_ui_loop
+        pass
 
     def draw_timeline_progress(self, progress):
         self.timeline_canvas.delete("all")
@@ -115,20 +124,52 @@ class ControlsPanel(tk.Frame):
             0, 0, progress_width, height, fill=ERROR_COLOR, outline=""
         )
 
-    def _update_timeline_loop(self):
-        """Periodically fetch media position in background thread and update UI."""
+    def _fetch_windows_loop(self):
+        """Slow loop: fetch position from Windows media session every 500ms."""
         def fetch():
             try:
                 position, total = asyncio.run(get_media_position())
             except Exception:
                 position, total = 0.0, 0.0
-            # schedule UI update on main thread
-            self.after(0, lambda: self._apply_position(position, total))
+            # Schedule processing on main thread
+            self.after(0, lambda: self._process_windows_update(position, total))
         threading.Thread(target=fetch, daemon=True).start()
-        self.after(500, self._update_timeline_loop)
+        self.after(500, self._fetch_windows_loop)
 
-    def _apply_position(self, position, total):
+    def _process_windows_update(self, position, total):
+        """Process the position/duration from Windows media session."""
+        # Update total duration if it changed
+        if total != self._last_total_duration:
+            self._last_total_duration = total
+            self.total_duration_label.config(text=format_display_time(total))
+
+        # If position changed (user action or natural progression), sync local timer
+        if position != self._last_windows_position:
+            previous = self._last_windows_position
+            self._last_windows_position = position
+            print(f"[Session] Window session update from {format_display_time(previous)} to {format_display_time(position)}")
+            if not self._has_synced:
+                self._local_timer.start(position)
+                self._has_synced = True
+            else:
+                self._local_timer.sync(position)
+            # Immediately update UI with the fresh Windows position
+            self._update_ui_from_timer()
+
+    def _update_ui_loop(self):
+        """Fast loop: update UI from local timer every ~100ms for smooth progress."""
+        self._update_ui_from_timer()
+        self.after(100, self._update_ui_loop)
+
+    def _update_ui_from_timer(self):
+        """Update current time label and progress bar from local timer."""
+        if not self._has_synced:
+            return
+        position = self._local_timer.get_position()
+        total = self._last_total_duration
+        # Clamp position to total duration
+        if total > 0 and position > total:
+            position = total
         self.current_time_label.config(text=format_display_time(position))
-        self.total_duration_label.config(text=format_display_time(total))
         progress = (position / total) if total > 0 else 0.0
         self.draw_timeline_progress(progress)
