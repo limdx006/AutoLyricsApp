@@ -1,5 +1,9 @@
 import tkinter as tk
+import asyncio
+import threading
 from config import *
+from media_detect import get_media_position
+from time_formatter import format_display_time
 
 
 class ControlsPanel(tk.Frame):
@@ -21,6 +25,8 @@ class ControlsPanel(tk.Frame):
         self._build_timeline()
         self._build_buttons()
         self._build_status()
+        # start periodic timeline updates
+        self.after(0, self._update_timeline_loop)
 
     """Construction helpers"""
 
@@ -45,7 +51,7 @@ class ControlsPanel(tk.Frame):
 
         self.current_time_label = tk.Label(
             button_frame,
-            text="00:30",
+            text="00:00",
             bg=BG_COLOR,
             fg=COLOR_ACTIVE_FG,
             font=(FONT_FAMILY, 10),
@@ -63,7 +69,7 @@ class ControlsPanel(tk.Frame):
 
         self.total_duration_label = tk.Label(
             button_frame,
-            text="04:33",
+            text="00:00",
             bg=BG_COLOR,
             fg=COLOR_ACTIVE_FG,
             font=(FONT_FAMILY, 10),
@@ -96,7 +102,7 @@ class ControlsPanel(tk.Frame):
     """Behavior"""
 
     def on_timeline_configure(self, event):
-        self.draw_timeline_progress(0.50)
+        self.draw_timeline_progress(0.0)
 
     def draw_timeline_progress(self, progress):
         self.timeline_canvas.delete("all")
@@ -108,3 +114,21 @@ class ControlsPanel(tk.Frame):
         self.timeline_canvas.create_rectangle(
             0, 0, progress_width, height, fill=ERROR_COLOR, outline=""
         )
+
+    def _update_timeline_loop(self):
+        """Periodically fetch media position in background thread and update UI."""
+        def fetch():
+            try:
+                position, total = asyncio.run(get_media_position())
+            except Exception:
+                position, total = 0.0, 0.0
+            # schedule UI update on main thread
+            self.after(0, lambda: self._apply_position(position, total))
+        threading.Thread(target=fetch, daemon=True).start()
+        self.after(500, self._update_timeline_loop)
+
+    def _apply_position(self, position, total):
+        self.current_time_label.config(text=format_display_time(position))
+        self.total_duration_label.config(text=format_display_time(total))
+        progress = (position / total) if total > 0 else 0.0
+        self.draw_timeline_progress(progress)
