@@ -10,7 +10,7 @@ from local_timer import LocalTimer
 class ControlsPanel(tk.Frame):
     """Bottom section of the player: timeline, transport buttons, and status label."""
 
-    def __init__(self, parent, on_song_change=None, on_time_update=None, **kwargs):
+    def __init__(self, parent, initial_title="", initial_artist="", on_song_change=None, on_time_update=None, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
 
         # Fixed height = 20% of window height
@@ -29,8 +29,8 @@ class ControlsPanel(tk.Frame):
         self._last_total_duration = 0.0
         self._has_synced = False
         # Song info tracking
-        self._last_title = ""
-        self._last_artist = ""
+        self._last_title = initial_title
+        self._last_artist = initial_artist
         self._on_song_change = on_song_change
         self._on_time_update = on_time_update
 

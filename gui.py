@@ -34,6 +34,8 @@ class LyricsApp:
         # Controls (bottom 25%)
         self.controls = ControlsPanel(
             self.root,
+            initial_title=title,
+            initial_artist=artist,
             on_song_change=self._handle_song_change,
             on_time_update=self.lyrics_display.update_time,
         )
