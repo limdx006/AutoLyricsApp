@@ -19,9 +19,12 @@ class LocalTimer:
             self._running = True
 
     def stop(self):
-        """Stop the local timer."""
+        """Stop the local timer, freezing it at the current accumulated position."""
         with self._lock:
-            self._running = False
+            if self._running:
+                elapsed = time.monotonic() - self._start_timestamp
+                self._start_position = self._start_position + elapsed
+                self._running = False
 
     def get_position(self):
         """Return the current estimated position in seconds."""

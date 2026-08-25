@@ -133,21 +133,23 @@ class ControlsPanel(tk.Frame):
         )
 
     def _fetch_windows_loop(self):
-        """Slow loop: fetch position and media info from Windows media session every 500ms."""
+        """Slow loop: fetch position, media info, and playback status from Windows media session every 500ms."""
         def fetch():
             try:
                 position, total = asyncio.run(get_media_position())
                 title, artist = asyncio.run(get_media_info())
+                status = asyncio.run(get_playback_status())
             except Exception:
                 position, total = 0.0, 0.0
                 title, artist = "Undetected Song", "Unknown Artist"
+                status = "stopped"
             # Schedule processing on main thread
-            self.after(0, lambda: self._process_windows_update(position, total, title, artist))
+            self.after(0, lambda: self._process_windows_update(position, total, title, artist, status))
         threading.Thread(target=fetch, daemon=True).start()
         self.after(500, self._fetch_windows_loop)
 
-    def _process_windows_update(self, position, total, title, artist):
-        """Process the position/duration/media info from Windows media session."""
+    def _process_windows_update(self, position, total, title, artist, status):
+        """Process the position/duration/media info/status from Windows media session."""
         # Update total duration if it changed
         if total != self._last_total_duration:
             self._last_total_duration = total
@@ -162,6 +164,16 @@ class ControlsPanel(tk.Frame):
             print(f"[Session] Detected song update {title} by {artist}")
             if self._on_song_change:
                 self._on_song_change(title, artist)
+
+        # Sync play/pause button symbol and timer state with external playback status
+        if status == "playing":
+            self.play_pause_button.config(text="\u23f8")  # pause symbol
+            if not self._local_timer.is_running() and self._has_synced:
+                self._local_timer.start(position)
+        elif status in ("paused", "stopped"):
+            self.play_pause_button.config(text="\u25B6")  # play symbol
+            if self._local_timer.is_running():
+                self._local_timer.stop()
 
         # If position changed (user action or natural progression), sync local timer
         if position != self._last_windows_position:

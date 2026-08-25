@@ -29,8 +29,6 @@ async def main():
     print("*****************************************************************")
 
     title, artist = await detect_media()
-    print(f"Detected title: {title}, artist: {artist}")
-    # lyrics_fetcher(title, artist)
 
     # Display the GUI
     root = tk.Tk()

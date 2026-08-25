@@ -11,13 +11,18 @@ def auto_nudge():
     try:
         status = asyncio.run(get_playback_status())
         if status == "playing":
+            print("[Nudge] Attempt auto nudge")
             # pause
             asyncio.run(control_pause())
             # wait 0.5 s then resume
             time.sleep(0.5)
             asyncio.run(control_play())
+            if status == "playing":
+                print("[Nudge] Resume successfully")
+            else:
+                print("[Nudge] Resume failed")
     except Exception as e:
-        print(f"Auto nudge failed: {e}")
+        print(f"[Nudge] Auto nudge failed: {e}")
 
 def trigger_auto_nudge():
     """Run auto_nudge in a background daemon thread."""

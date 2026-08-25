@@ -38,7 +38,7 @@ def lyrics_fetcher(title, artist):
         try:
             lyrics = syncedlyrics.search(query)
             cleaned = remove_empty_lines(lyrics)
-            print(f"[Lyrics] Retrieved lyrics for '{query}':\n{cleaned}")
+            print(f"[Lyrics] Retrieved lyrics for '{query}'")
             return cleaned  # Return cleaned lyrics
         except Exception as e:
             print(f"[Lyrics] Attempt {attempt + 1} failed for '{query}': {e}")
