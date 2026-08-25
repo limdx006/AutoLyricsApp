@@ -1,9 +1,12 @@
 import tkinter as tk
+import threading
 from tkinter import font as tkfont
 from config import *
 from gui_controls_panel import ControlsPanel
 from gui_media_details import MediaDetails
 from gui_language_bar import LanguageBar
+from gui_lyrics_display import LyricsDisplay
+from lyrics_fetcher import lyrics_fetcher
 
 
 class LyricsApp:
@@ -22,21 +25,36 @@ class LyricsApp:
         self.language_bar = LanguageBar(self.root)
         self.language_bar.pack(side=tk.TOP, fill=tk.X)
 
-        # Lyrics display area (expanding middle section)
-        self.lyrics_label = tk.Label(
-            self.root,
-            text="Lyrics will be displayed here",
-            bg=BG_COLOR,
-            fg=COLOR_ACTIVE_FG,
-            font=(FONT_FAMILY, 12),
-        )
-        self.lyrics_label.pack(
+        # Lyrics display area (expanding middle section) - dynamic, time-synced scrolling
+        self.lyrics_display = LyricsDisplay(self.root)
+        self.lyrics_display.pack(
             side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(5, 10)
         )
 
         # Controls (bottom 25%)
         self.controls = ControlsPanel(
             self.root,
-            on_song_change=lambda t, a: self.media_details.update_song_info(t, a)
+            on_song_change=self._handle_song_change,
+            on_time_update=self.lyrics_display.update_time,
         )
         self.controls.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Fetch lyrics for the initially detected song, if any
+        if title and artist:
+            self._fetch_lyrics_async(title, artist)
+
+    def _handle_song_change(self, title, artist):
+        """Called by ControlsPanel whenever the detected song changes."""
+        self.media_details.update_song_info(title, artist)
+        self._fetch_lyrics_async(title, artist)
+
+    def _fetch_lyrics_async(self, title, artist):
+        """Fetch lyrics off the main thread, then hand them to the lyrics display."""
+        def fetch():
+            try:
+                lyrics = lyrics_fetcher(title, artist)
+            except Exception as e:
+                print(f"Lyrics fetch failed: {e}")
+                lyrics = None
+            self.root.after(0, lambda: self.lyrics_display.set_lyrics(lyrics))
+        threading.Thread(target=fetch, daemon=True).start()

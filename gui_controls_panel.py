@@ -10,7 +10,7 @@ from local_timer import LocalTimer
 class ControlsPanel(tk.Frame):
     """Bottom section of the player: timeline, transport buttons, and status label."""
 
-    def __init__(self, parent, on_song_change=None, **kwargs):
+    def __init__(self, parent, on_song_change=None, on_time_update=None, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
 
         # Fixed height = 20% of window height
@@ -32,6 +32,7 @@ class ControlsPanel(tk.Frame):
         self._last_title = ""
         self._last_artist = ""
         self._on_song_change = on_song_change
+        self._on_time_update = on_time_update
 
         self._build_timeline()
         self._build_buttons()
@@ -192,6 +193,8 @@ class ControlsPanel(tk.Frame):
         self.current_time_label.config(text=format_display_time(position))
         progress = (position / total) if total > 0 else 0.0
         self.draw_timeline_progress(progress)
+        if self._on_time_update:
+            self._on_time_update(position)
 
     def _on_previous(self):
         """Handle previous track button click."""
@@ -219,9 +222,13 @@ class ControlsPanel(tk.Frame):
                 if status == "playing":
                     asyncio.run(control_pause())
                     new_symbol = "\u25B6"  # play symbol
+                    # Freeze the local timer so the displayed position/lyrics stop too
+                    self.after(0, self._local_timer.stop)
                 else:
                     asyncio.run(control_play())
                     new_symbol = "\u23f8"  # pause symbol
+                    # Resume the local timer from wherever it was frozen
+                    self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))
                 # Update button symbol on main thread
                 self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
             except Exception as e:
