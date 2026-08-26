@@ -1,7 +1,15 @@
+import re
 import tkinter as tk
 from config import *
 from auto_nudge import trigger_auto_nudge
 
+
+
+# Matches everything the offset entry should accept while typing: an
+# optional leading '-' (offset can go negative), digits, and at most one
+# '.'. Also allows "" and "-" alone so the field can be cleared / a minus
+# typed first without getting rejected mid-edit.
+_OFFSET_INPUT_PATTERN = re.compile(r"^-?\d*\.?\d*$")
 
 
 class MediaDetails(tk.Frame):
@@ -85,11 +93,14 @@ class MediaDetails(tk.Frame):
         self.minus_button = self._make_offset_button(
             self.offset_frame, "-", lambda: self._adjust_offset(-0.1)
         )
+        offset_vcmd = (self.register(self._validate_offset_input), "%P")
         self.offset_entry = tk.Entry(
             self.offset_frame,
             textvariable=self.offset_var,
             width=5,
             justify="center",
+            validate="key",
+            validatecommand=offset_vcmd,
         )
         self.offset_entry.pack(side="left", padx=2)
         self.plus_button = self._make_offset_button(
@@ -106,19 +117,12 @@ class MediaDetails(tk.Frame):
             "\u2699", 1, 2, sticky="n"
         )  # ⚙ is U+2699
 
-    def _make_offset_button(self, parent, symbol, command, size=OFFSET_BUTTON_SIZE):
-        """
-        Create a fixed pixel-size square button.
+    def _validate_offset_input(self, proposed_value):
+        """Key-validation callback for the offset entry (validate="key")."""
+        return bool(_OFFSET_INPUT_PATTERN.match(proposed_value))
 
-        tk.Button's width/height options are measured in text units
-        (characters/lines), not pixels - and on Windows the native theme
-        enforces its own minimum button height, silently ignoring the
-        'height' option entirely (width isn't affected, which is why only
-        width appeared to work). Wrapping the button in a Frame with an
-        explicit pixel width/height and pack_propagate(False) sidesteps
-        that: the Frame's pixel size is respected regardless of platform,
-        and the button just fills it.
-        """
+    def _make_offset_button(self, parent, symbol, command, size=OFFSET_BUTTON_SIZE):
+        """Create a fixed pixel-size square button."""
         container = tk.Frame(parent, width=size, height=size, bg=ACCENT_COLOR)
         container.pack_propagate(False)  # keep the fixed pixel size regardless of contents
         container.pack(side="left", padx=2)
