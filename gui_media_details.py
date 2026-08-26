@@ -67,15 +67,32 @@ class MediaDetails(tk.Frame):
         )
         self.artist_name_label.grid(row=1, column=0, sticky="")  # centered
 
-        # Offset label (second row, middle column)
+        # Offset control (second row, middle column)
+        self.offset_frame = tk.Frame(self, bg=ACCENT_COLOR)
+        self.offset_frame.grid(row=1, column=1, padx=5, pady=5)
+        # Center the frame contents
         self.offset_label = tk.Label(
-            self,
-            text="Offset",
-            font=(FONT_FAMILY, 10),
+            self.offset_frame,
+            text="Offset:",
+            font=(FONT_FAMILY, 12, "bold"),
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
         )
-        self.offset_label.grid(row=1, column=1, sticky="", padx=5, pady=5)
+        self.offset_label.pack(side="left", padx=2)
+        self.offset_var = tk.DoubleVar(value=DEFAULT_OFFSET)
+        self.minus_button = self._make_offset_button(
+            self.offset_frame, "-", lambda: self._adjust_offset(-0.1)
+        )
+        self.offset_entry = tk.Entry(
+            self.offset_frame,
+            textvariable=self.offset_var,
+            width=5,
+            justify="center",
+        )
+        self.offset_entry.pack(side="left", padx=2)
+        self.plus_button = self._make_offset_button(
+            self.offset_frame, "+", lambda: self._adjust_offset(0.1)
+        )
 
         # Right column: Pin button (row0) and Settings button (row1)
         self.pin_button = self.create_button(
@@ -86,6 +103,41 @@ class MediaDetails(tk.Frame):
         self.settings_button = self.create_button(
             "\u2699", 1, 2, sticky="n"
         )  # ⚙ is U+2699
+
+    def _make_offset_button(self, parent, symbol, command, size=OFFSET_BUTTON_SIZE):
+        """
+        Create a fixed pixel-size square button.
+
+        tk.Button's width/height options are measured in text units
+        (characters/lines), not pixels - and on Windows the native theme
+        enforces its own minimum button height, silently ignoring the
+        'height' option entirely (width isn't affected, which is why only
+        width appeared to work). Wrapping the button in a Frame with an
+        explicit pixel width/height and pack_propagate(False) sidesteps
+        that: the Frame's pixel size is respected regardless of platform,
+        and the button just fills it.
+        """
+        container = tk.Frame(parent, width=size, height=size, bg=ACCENT_COLOR)
+        container.pack_propagate(False)  # keep the fixed pixel size regardless of contents
+        container.pack(side="left", padx=2)
+
+        button = tk.Button(
+            container,
+            text=symbol,
+            font=(FONT_FAMILY, 12),
+            command=command,
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            bg=COLOR_ACTIVE_FG,
+            fg=COLOR_FAR_FG,
+            activebackground=COLOR_FAR_FG,
+            activeforeground=COLOR_ACTIVE_FG,
+        )
+        button.pack(fill=tk.BOTH, expand=True)
+        button.bind("<Enter>", lambda e: e.widget.configure(bg=COLOR_ARTIST_FG))
+        button.bind("<Leave>", lambda e: e.widget.configure(bg=COLOR_ACTIVE_FG))
+        return button
 
     def create_button(self, symbol, row, column, font_size=16, sticky="nsew"):
         button = tk.Button(
@@ -114,6 +166,16 @@ class MediaDetails(tk.Frame):
             self.pin_button.configure(fg=ERROR_COLOR)
         else:
             self.pin_button.configure(fg=COLOR_ACTIVE_FG)
+
+    def _adjust_offset(self, delta: float):
+        """Adjust the offset value by *delta* and clamp it within [-99.0, 99.0]."""
+        # Get current value, apply delta, clamp to allowed range
+        new_val = round(self.offset_var.get() + delta, 2)
+        if new_val < -99.0:
+            new_val = -99.0
+        if new_val > 99.0:
+            new_val = 99.0
+        self.offset_var.set(new_val)
 
     def update_song_info(self, title, artist):
         """Update the displayed song title and artist."""
