@@ -7,8 +7,9 @@ from auto_nudge import trigger_auto_nudge
 class MediaDetails(tk.Frame):
     """Top section of the player: Media name, artist and multiple feature buttons"""
 
-    def __init__(self, parent, title="Song name here", artist="artist name", **kwargs):
+    def __init__(self, parent, title="Song name here", artist="artist name", on_offset_change=None, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
+        self._on_offset_change = on_offset_change
 
         # Fixed height = 30% of window height
         self.configure(height=int(WINDOW_HEIGHT * 0.3))
@@ -80,6 +81,7 @@ class MediaDetails(tk.Frame):
         )
         self.offset_label.pack(side="left", padx=2)
         self.offset_var = tk.DoubleVar(value=DEFAULT_OFFSET)
+        self.offset_var.trace_add("write", self._on_offset_var_changed)
         self.minus_button = self._make_offset_button(
             self.offset_frame, "-", lambda: self._adjust_offset(-0.1)
         )
@@ -167,6 +169,25 @@ class MediaDetails(tk.Frame):
         else:
             self.pin_button.configure(fg=COLOR_ACTIVE_FG)
 
+    def _on_offset_var_changed(self, *args):
+        """Notify the on_offset_change callback whenever the offset value changes."""
+        if not self._on_offset_change:
+            return
+        try:
+            value = self.offset_var.get()
+        except tk.TclError:
+            # Entry box is mid-edit (e.g. empty or just "-") - not a valid
+            # float yet, skip until it resolves to something parseable.
+            return
+        self._on_offset_change(value)
+
+    def get_offset(self):
+        """Return the current offset in seconds, or 0.0 if the entry is mid-edit."""
+        try:
+            return self.offset_var.get()
+        except tk.TclError:
+            return 0.0
+
     def _adjust_offset(self, delta: float):
         """Adjust the offset value by *delta* and clamp it within [-99.0, 99.0]."""
         # Get current value, apply delta, clamp to allowed range
@@ -177,7 +198,16 @@ class MediaDetails(tk.Frame):
             new_val = 99.0
         self.offset_var.set(new_val)
 
+    def reset_offset(self):
+        """Reset the lyric offset back to DEFAULT_OFFSET (e.g. on a new song).
+        Setting the var fires the existing trace, which propagates the reset
+        to the lyrics display via on_offset_change - no other wiring needed.
+        """
+        self.offset_var.set(DEFAULT_OFFSET)
+
     def update_song_info(self, title, artist):
-        """Update the displayed song title and artist."""
+        """Update the displayed song title and artist, and reset the lyric
+        offset to default since it's specific to the previous song."""
         self.song_name_label.config(text=title)
         self.artist_name_label.config(text=artist)
+        self.reset_offset()

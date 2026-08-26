@@ -18,7 +18,13 @@ class LyricsApp:
         self.root.configure(bg=BG_COLOR)
 
         # Media details area (top 30%)
-        self.media_details = MediaDetails(self.root, title, artist)
+        self.media_details = MediaDetails(
+            self.root, title, artist,
+            # lyrics_display doesn't exist yet at this point - the lambda
+            # defers the attribute lookup until the offset actually changes
+            # (i.e. after __init__ has finished and everything is built).
+            on_offset_change=lambda offset: self.lyrics_display.set_offset(offset),
+        )
         self.media_details.pack(side=tk.TOP, fill=tk.X)
 
         # Language bar area (10% below media details area)
@@ -30,6 +36,9 @@ class LyricsApp:
         self.lyrics_display.pack(
             side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(5, 10)
         )
+        # Sync the lyrics display with whatever offset is already showing
+        # (e.g. DEFAULT_OFFSET from config.py) now that both widgets exist.
+        self.lyrics_display.set_offset(self.media_details.get_offset())
 
         # Controls (bottom 25%)
         self.controls = ControlsPanel(

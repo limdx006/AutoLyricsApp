@@ -63,6 +63,12 @@ class LyricsDisplay(tk.Frame):
         self._scroll_target = 0.0
         self._scroll_animating = False
 
+        # Lyric offset in seconds, applied only to which line looks "current" -
+        # never to the actual playback timer. Positive = advance lyrics
+        # (line is picked earlier); negative = delay them (picked later).
+        self._offset = 0.0
+        self._last_raw_time = 0.0
+
         self._placeholder_id = self.canvas.create_text(
             0,
             0,
@@ -103,9 +109,30 @@ class LyricsDisplay(tk.Frame):
 
     def update_time(self, current_time):
         """Update the highlighted/centered line for the given playback time (seconds)."""
+        self._last_raw_time = current_time
         if not self._lines:
             return
-        index = self._find_current_index(current_time)
+        index = self._find_current_index(current_time + self._offset)
+        if index != self._current_index:
+            self._set_current_index(index)
+
+    def set_offset(self, offset_seconds):
+        """
+        Set the lyric offset in seconds - shifts which line is considered
+        "current" without affecting actual playback timing at all.
+
+        Positive values advance the lyrics (a line is shown earlier than its
+        timestamp); negative values delay them (shown later). Re-evaluates
+        immediately using the last known playback time, so adjusting the
+        offset mid-song updates the highlighted line right away instead of
+        waiting for the next natural update_time() call.
+        """
+        if offset_seconds == self._offset:
+            return
+        self._offset = offset_seconds
+        if not self._lines:
+            return
+        index = self._find_current_index(self._last_raw_time + self._offset)
         if index != self._current_index:
             self._set_current_index(index)
 
