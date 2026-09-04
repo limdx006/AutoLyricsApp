@@ -107,7 +107,7 @@ async def detect_media():
         print(f"  Title:    {session_info.title or 'Undetected Song'}")
         print(f"  Artist:   {session_info.artist or 'Unknown Artist'}")
         print(f"  Position: {timeline.position.total_seconds():.1f}s / {timeline.end_time.total_seconds():.1f}s")
-        print(f"  Source:   {session.source_app_user_model_id or 'Unknown'}")
+        print(f"  Source:   {session.source_app_user_model_id or 'Unknown'} \n")
 
     return title, artist
 

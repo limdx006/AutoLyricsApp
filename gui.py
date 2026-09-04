@@ -7,7 +7,9 @@ from gui_media_details import MediaDetails
 from gui_language_bar import LanguageBar
 from gui_lyrics_display import LyricsDisplay
 from lyrics_fetcher import lyrics_fetcher
+from auto_nudge import trigger_auto_nudge
 
+first_run = True  # Global flag to indicate if it's the first run of the application
 
 class LyricsApp:
     def __init__(self, root, title="Song name here", artist="artist name"):
@@ -69,3 +71,6 @@ class LyricsApp:
                 lyrics = None
             self.root.after(0, lambda: self.lyrics_display.set_lyrics(lyrics))
         threading.Thread(target=fetch, daemon=True).start()
+        if first_run:
+            trigger_auto_nudge(0.1)  # Trigger auto nudge on first run to refresh media session
+            first_run = False  # Reset the first run flag after the initial fetch
