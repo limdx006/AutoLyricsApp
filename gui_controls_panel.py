@@ -33,6 +33,10 @@ class ControlsPanel(tk.Frame):
         self._last_artist = initial_artist
         self._on_song_change = on_song_change
         self._on_time_update = on_time_update
+        """Consecutive polls reporting the "no session" sentinel values ("Undetected Song" / "Unknown Artist"). 
+        Windows may briefly report these during transitions (e.g. a "repeat one" restart), 
+        so require confirmation on the next poll before treating them as a real change."""
+        self._unknown_streak = 0
 
         self._build_timeline()
         self._build_buttons()
@@ -156,14 +160,25 @@ class ControlsPanel(tk.Frame):
             self.total_duration_label.config(text=format_display_time(total))
 
         # Check for song change
+        is_unknown = (title == "Undetected Song" and artist == "Unknown Artist")
+        self._unknown_streak = self._unknown_streak + 1 if is_unknown else 0
+
         if title != self._last_title or artist != self._last_artist:
-            previous_title = self._last_title
-            previous_artist = self._last_artist
-            self._last_title = title
-            self._last_artist = artist
-            print(f"[Session] Detected song update {title} by {artist}")
-            if self._on_song_change:
-                self._on_song_change(title, artist)
+            if is_unknown and self._unknown_streak < 2:
+                """
+                Likely a transient session glitch (e.g. during a "repeat one" restart), 
+                not a real song change. Ignore this poll: don't update last song or fire on_song_change. 
+                A real disappearance will repeat and pass the streak check below.
+                """
+                print(f"[Session] Ignoring possible transient 'no session' report, awaiting confirmation")
+            else:
+                previous_title = self._last_title
+                previous_artist = self._last_artist
+                self._last_title = title
+                self._last_artist = artist
+                print(f"[Session] Detected song update {title} by {artist}")
+                if self._on_song_change:
+                    self._on_song_change(title, artist)
 
         # Sync play/pause button symbol and timer state with external playback status
         if status == "playing":

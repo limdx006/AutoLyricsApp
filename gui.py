@@ -9,11 +9,12 @@ from gui_lyrics_display import LyricsDisplay
 from lyrics_fetcher import lyrics_fetcher
 from auto_nudge import trigger_auto_nudge
 
-first_run = True  # Global flag to indicate if it's the first run of the application
 
 class LyricsApp:
     def __init__(self, root, title="Song name here", artist="artist name"):
         self.root = root
+        self._lyrics_fetch_generation = 0
+        self._first_run = True
         self.root.title("Lyrics Player")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(False, False)
@@ -62,15 +63,34 @@ class LyricsApp:
         self._fetch_lyrics_async(title, artist)
 
     def _fetch_lyrics_async(self, title, artist):
-        """Fetch lyrics off the main thread, then hand them to the lyrics display."""
+        """Fetch lyrics off the main thread, then hand them to the lyrics display.
+
+        Fetches run concurrently on background threads with no ordering
+        guarantee, so a slow/retried fetch for a stale (title, artist) can
+        finish after a newer one and clobber good lyrics with None. A
+        generation token makes sure only the result of the most recently
+        requested fetch is ever applied.
+        """
+        self._lyrics_fetch_generation += 1
+        my_generation = self._lyrics_fetch_generation
+
         def fetch():
             try:
                 lyrics = lyrics_fetcher(title, artist)
             except Exception as e:
                 print(f"Lyrics fetch failed: {e}")
                 lyrics = None
-            self.root.after(0, lambda: self.lyrics_display.set_lyrics(lyrics))
+
+            def apply():
+                if my_generation != self._lyrics_fetch_generation:
+                    # A newer fetch has since been kicked off - this result
+                    # is stale, discard it instead of overwriting current lyrics.
+                    print(f"[Lyrics] Discarding stale result for '{title}' by '{artist}'")
+                    return
+                self.lyrics_display.set_lyrics(lyrics)
+
+            self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()
-        if first_run:
+        if self._first_run:
             trigger_auto_nudge(0.1)  # Trigger auto nudge on first run to refresh media session
-            first_run = False  # Reset the first run flag after the initial fetch
+            self._first_run = False  # Reset the first run flag after the initial fetch
