@@ -7,6 +7,7 @@ from gui_media_details import MediaDetails
 from gui_language_bar import LanguageBar
 from gui_lyrics_display import LyricsDisplay
 from lyrics_fetcher import lyrics_fetcher
+from language_detect import detect_lyrics_language
 from auto_nudge import trigger_auto_nudge
 
 
@@ -88,6 +89,8 @@ class LyricsApp:
                     print(f"[Lyrics] Discarding stale result for '{title}' by '{artist}'")
                     return
                 self.lyrics_display.set_lyrics(lyrics)
+                detected_language = detect_lyrics_language(lyrics) if lyrics else "Unknown"
+                self.language_bar.set_language(detected_language)
 
             self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()

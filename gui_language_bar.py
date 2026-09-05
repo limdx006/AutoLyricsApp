@@ -33,13 +33,14 @@ class LanguageBar(tk.Frame):
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
         ).pack()
-        tk.Label(
+        self.language_value_label = tk.Label(
             left_frame,
             text="Unknown",
             font=(FONT_FAMILY, 8),
             bg=ACCENT_COLOR,
             fg=COLOR_NEARBY_FG,
-        ).pack()
+        )
+        self.language_value_label.pack()
 
         # Center: Switch button (hardcoded for now)
         switch_button = tk.Button(
@@ -73,3 +74,7 @@ class LanguageBar(tk.Frame):
             bg=ACCENT_COLOR,
             fg=COLOR_NEARBY_FG,
         ).pack()
+
+    def set_language(self, language_text):
+        """Update the detected-language value shown on the left side of the bar."""
+        self.language_value_label.config(text=language_text)
