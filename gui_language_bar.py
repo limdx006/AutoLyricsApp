@@ -57,6 +57,15 @@ class ToggleSwitch(tk.Canvas):
         if self._on_toggle:
             self._on_toggle(self.state)
 
+    def reset(self):
+        """Snap back to off instantly (e.g. on song change) - no animation, no callback."""
+        self.state = 0
+        self.itemconfig(self._track_id, fill=COLOR_FAR_FG)
+        self.itemconfig(self._arrow_id, state="hidden")
+        x1 = self._off_knob_x()
+        self.coords(self._knob_id, x1, self._PAD, x1 + self._knob_d, self._HEIGHT - self._PAD)
+        self._position_arrow(x1, self._PAD, x1 + self._knob_d, self._HEIGHT - self._PAD)
+
     def _animate_knob(self):
         target = self._on_knob_x() if self.state else self._off_knob_x()
         current = self.coords(self._knob_id)[0]
@@ -78,9 +87,12 @@ class LanguageBar(tk.Frame):
 
     # Languages with no translation mode - switch stays hidden for these
     _NO_TRANSLATION_LANGUAGES = {"English", "Unknown"}
+    # Display mode shown when the switch is on, per detected language
+    _TRANSLATION_MODE = {"Chinese": "PinYin", "Japanese": "Romaji", "Korean": "Romaji"}
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
+        self._current_language = "Unknown"
 
         # Fixed height = 10% of window height below song details
         self.configure(height=int(WINDOW_HEIGHT * 0.1))
@@ -125,7 +137,7 @@ class LanguageBar(tk.Frame):
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
         )
-        self.language_switch = ToggleSwitch(self.switch_frame, bg=ACCENT_COLOR)
+        self.language_switch = ToggleSwitch(self.switch_frame, bg=ACCENT_COLOR, on_toggle=self._on_switch_toggle)
         self._set_switch_visible(False)
 
         # Right side: Current label and value
@@ -138,13 +150,14 @@ class LanguageBar(tk.Frame):
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
         ).pack()
-        tk.Label(
+        self.current_value_label = tk.Label(
             right_frame,
-            text="Unknown",
+            text="Original",
             font=(FONT_FAMILY, 8),
             bg=ACCENT_COLOR,
             fg=COLOR_NEARBY_FG,
-        ).pack()
+        )
+        self.current_value_label.pack()
 
     def _set_switch_visible(self, visible):
         """Show/hide the label+switch contents without touching the frame itself, so the reserved column width/height never changes."""
@@ -155,7 +168,15 @@ class LanguageBar(tk.Frame):
             self._translate_label.pack_forget()
             self.language_switch.pack_forget()
 
+    def _on_switch_toggle(self, state):
+        """Update the Current: label to match the switch state and detected language."""
+        mode = self._TRANSLATION_MODE.get(self._current_language, "Original") if state else "Original"
+        self.current_value_label.config(text=mode)
+
     def set_language(self, language_text):
-        """Update the detected-language value and show/hide the translate switch accordingly."""
+        """Update the detected-language value, reset to Original, and show/hide the switch accordingly."""
         self.language_value_label.config(text=language_text)
+        self._current_language = language_text
         self._set_switch_visible(language_text not in self._NO_TRANSLATION_LANGUAGES)
+        self.language_switch.reset()
+        self.current_value_label.config(text="Original")
