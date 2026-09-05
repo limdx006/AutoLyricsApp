@@ -1,0 +1,129 @@
+"""
+Debug log capture and viewer.
+
+install_log_capture() tees stdout/stderr so every existing print() call
+across the app still prints to the console as usual, but is also pushed
+into a bounded in-memory buffer (last MAX_LOG_LINES messages, oldest
+dropped first). open_log_viewer() opens a resizable, scrollable window
+showing that buffer, which keeps updating live as new lines come in -
+including from background threads, since prints from the sync loops,
+lyrics fetches, and auto-nudge all happen off the main thread.
+"""
+
+import sys
+import threading
+import tkinter as tk
+from collections import deque
+from config import *
+
+MAX_LOG_LINES = 50
+
+_log_buffer = deque(maxlen=MAX_LOG_LINES)
+_log_lock = threading.Lock()
+_subscribers = []  # callbacks notified with each new line, for live viewer windows
+_active_window = None  # the single open LogViewerWindow, if any
+
+
+class _TeeStream:
+    """A stdout/stderr replacement that writes through to the original stream and also captures each line into the log buffer."""
+
+    def __init__(self, original_stream):
+        self._original = original_stream
+
+    def write(self, text):
+        self._original.write(text)
+        # print() may call write() more than once per statement (message,
+        # then a trailing "\n"), so only capture complete, non-blank lines.
+        for line in text.splitlines():
+            if line.strip():
+                with _log_lock:
+                    _log_buffer.append(line)
+                for callback in list(_subscribers):
+                    callback(line)
+
+    def flush(self):
+        self._original.flush()
+
+
+def install_log_capture():
+    """Redirect stdout/stderr through the tee. Call once, as early as possible at startup."""
+    sys.stdout = _TeeStream(sys.stdout)
+    sys.stderr = _TeeStream(sys.stderr)
+
+
+def get_log_lines():
+    """Return a snapshot of the currently buffered lines, oldest first."""
+    with _log_lock:
+        return list(_log_buffer)
+
+
+class LogViewerWindow(tk.Toplevel):
+    """Resizable, scrollable window showing the last MAX_LOG_LINES captured log messages, updating live as new ones arrive."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Log Viewer")
+        self.geometry("420x320")
+        self.minsize(280, 200)
+        self.configure(bg=BG_COLOR)
+
+        container = tk.Frame(self, bg=BG_COLOR)
+        container.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+        scrollbar = tk.Scrollbar(container)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.text = tk.Text(
+            container,
+            wrap="word",
+            bg=ACCENT_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            insertbackground=COLOR_ACTIVE_FG,
+            font=("Consolas", 10),
+            yscrollcommand=scrollbar.set,
+            state="disabled",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=4,
+        )
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.text.yview)
+
+        for line in get_log_lines():
+            self._append_line(line)
+
+        _subscribers.append(self._on_new_line)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _append_line(self, line):
+        self.text.configure(state="normal")
+        self.text.insert(tk.END, line + "\n")
+        # Mirror the buffer's cap in the widget itself, in case the window
+        # was open before the buffer trimmed a given line.
+        line_count = int(self.text.index("end-1c").split(".")[0])
+        if line_count > MAX_LOG_LINES:
+            self.text.delete("1.0", "2.0")
+        self.text.see(tk.END)
+        self.text.configure(state="disabled")
+
+    def _on_new_line(self, line):
+        # Tee.write() runs on whatever thread called print() - marshal the
+        # actual widget update onto the main thread via after().
+        self.after(0, lambda: self._append_line(line))
+
+    def _on_close(self):
+        if self._on_new_line in _subscribers:
+            _subscribers.remove(self._on_new_line)
+        self.destroy()
+
+
+def open_log_viewer(parent):
+    """Open the log viewer, or focus the existing one if it's already open."""
+    global _active_window
+    if _active_window is not None and _active_window.winfo_exists():
+        _active_window.lift()
+        _active_window.focus_force()
+        return _active_window
+    _active_window = LogViewerWindow(parent)
+    return _active_window

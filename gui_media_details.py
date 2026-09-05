@@ -2,6 +2,7 @@ import re
 import tkinter as tk
 from config import *
 from auto_nudge import trigger_auto_nudge
+from log_viewer import open_log_viewer
 
 
 
@@ -40,6 +41,7 @@ class MediaDetails(tk.Frame):
         self.log_button = self.create_button(
             "\U0001f4dd", 0, 0, sticky="n"
         )  # 📝 is U+1F4DD
+        self.log_button.configure(command=lambda: open_log_viewer(self.winfo_toplevel()))
         self.refresh_button = self.create_button(
             "\u27f3", 1, 0, font_size=18, sticky="n"
         )  # ⟳ is U+27F3
