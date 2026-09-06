@@ -2,9 +2,18 @@ import tkinter as tk
 import asyncio
 import threading
 from config import *
-from media_detect import get_media_position, get_playback_status, control_play, control_pause, control_next, control_previous, get_media_info
+from media_detect import get_position_for_session, get_status_for_session, control_play_session, control_pause_session, control_next_session, control_previous_session
+from media_selector import select_best_media
 from time_formatter import format_display_time
 from local_timer import LocalTimer
+
+
+async def _gather_update():
+    """Pick the best session (media_selector), then read its position/status - one asyncio.run() per poll instead of three."""
+    session, title, artist, _lyrics = await select_best_media()
+    position, total = await get_position_for_session(session)
+    status = await get_status_for_session(session)
+    return session, position, total, title, artist, status
 
 
 class ControlsPanel(tk.Frame):
@@ -28,6 +37,14 @@ class ControlsPanel(tk.Frame):
         self._last_windows_position = -1.0
         self._last_total_duration = 0.0
         self._has_synced = False
+        # The winsdk session object currently selected by media_selector -
+        # playback controls (prev/next/play-pause) act on this, not
+        # whatever Windows itself considers "current".
+        self._current_session = None
+        # Guards against overlapping fetch cycles: a rescore can trigger a
+        # real (slow) lyrics search, and without this the 500ms loop would
+        # keep firing on top of it, causing multiple concurrent rescores.
+        self._fetch_in_progress = False
         # Song info tracking
         self._last_title = initial_title
         self._last_artist = initial_artist
@@ -137,23 +154,35 @@ class ControlsPanel(tk.Frame):
         )
 
     def _fetch_windows_loop(self):
-        """Slow loop: fetch position, media info, and playback status from Windows media session every 500ms."""
+        """Slow loop: pick the best media session and fetch its position/info/status every 500ms.
+        Skips starting a new fetch while the previous one is still running (e.g. mid rescore/lyrics
+        search), instead of piling up overlapping fetches on top of each other."""
+        if self._fetch_in_progress:
+            self.after(500, self._fetch_windows_loop)
+            return
+        self._fetch_in_progress = True
+
         def fetch():
             try:
-                position, total = asyncio.run(get_media_position())
-                title, artist = asyncio.run(get_media_info())
-                status = asyncio.run(get_playback_status())
-            except Exception:
+                session, position, total, title, artist, status = asyncio.run(_gather_update())
+            except Exception as e:
+                print(f"[Session] Media selection failed: {e}")
+                session = None
                 position, total = 0.0, 0.0
                 title, artist = "Undetected Song", "Unknown Artist"
                 status = "stopped"
-            # Schedule processing on main thread
-            self.after(0, lambda: self._process_windows_update(position, total, title, artist, status))
+
+            def done():
+                self._fetch_in_progress = False
+                self._process_windows_update(session, position, total, title, artist, status)
+            self.after(0, done)
         threading.Thread(target=fetch, daemon=True).start()
         self.after(500, self._fetch_windows_loop)
 
-    def _process_windows_update(self, position, total, title, artist, status):
-        """Process the position/duration/media info/status from Windows media session."""
+    def _process_windows_update(self, session, position, total, title, artist, status):
+        """Process the position/duration/media info/status from the selected media session."""
+        self._current_session = session
+
         # Update total duration if it changed
         if total != self._last_total_duration:
             self._last_total_duration = total
@@ -224,35 +253,38 @@ class ControlsPanel(tk.Frame):
             self._on_time_update(position)
 
     def _on_previous(self):
-        """Handle previous track button click."""
+        """Handle previous track button click - acts on the currently selected session."""
+        session = self._current_session
         def run():
             try:
-                asyncio.run(control_previous())
+                asyncio.run(control_previous_session(session))
             except Exception as e:
                 print(f"Previous track failed: {e}")
         threading.Thread(target=run, daemon=True).start()
 
     def _on_next(self):
-        """Handle next track button click."""
+        """Handle next track button click - acts on the currently selected session."""
+        session = self._current_session
         def run():
             try:
-                asyncio.run(control_next())
+                asyncio.run(control_next_session(session))
             except Exception as e:
                 print(f"Next track failed: {e}")
         threading.Thread(target=run, daemon=True).start()
 
     def _on_play_pause(self):
-        """Handle play/pause button click - checks current status and toggles."""
+        """Handle play/pause button click - checks current status and toggles, on the currently selected session."""
+        session = self._current_session
         def run():
             try:
-                status = asyncio.run(get_playback_status())
+                status = asyncio.run(get_status_for_session(session))
                 if status == "playing":
-                    asyncio.run(control_pause())
+                    asyncio.run(control_pause_session(session))
                     new_symbol = "\u25B6"  # play symbol
                     # Freeze the local timer so the displayed position/lyrics stop too
                     self.after(0, self._local_timer.stop)
                 else:
-                    asyncio.run(control_play())
+                    asyncio.run(control_play_session(session))
                     new_symbol = "\u23f8"  # pause symbol
                     # Resume the local timer from wherever it was frozen
                     self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))

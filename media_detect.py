@@ -76,6 +76,60 @@ async def control_previous():
     if target:
         await target.try_skip_previous_async()
 
+
+"""
+Session-explicit variants below - operate on a specific session object
+(e.g. one chosen by media_selector.select_best_media()) instead of
+whichever session Windows itself considers "current". Used by the
+polling loop and playback controls once a session has been selected, so
+they always act on the actual displayed song rather than an arbitrary one.
+"""
+
+async def get_position_for_session(session):
+    """Like get_media_position, but for an explicit session."""
+    if not session:
+        return 0.0, 0.0
+    try:
+        timeline = session.get_timeline_properties()
+        return timeline.position.total_seconds(), timeline.end_time.total_seconds()
+    except Exception:
+        return 0.0, 0.0
+
+async def get_status_for_session(session):
+    """Like get_playback_status, but for an explicit session."""
+    if not session:
+        return "stopped"
+    try:
+        status = session.get_playback_info().playback_status
+        if status == PlaybackStatus.PLAYING:
+            return "playing"
+        elif status == PlaybackStatus.PAUSED:
+            return "paused"
+        else:
+            return "stopped"
+    except Exception:
+        return "stopped"
+
+async def control_play_session(session):
+    """Resume playback on an explicit session."""
+    if session:
+        await session.try_play_async()
+
+async def control_pause_session(session):
+    """Pause playback on an explicit session."""
+    if session:
+        await session.try_pause_async()
+
+async def control_next_session(session):
+    """Skip to next track on an explicit session."""
+    if session:
+        await session.try_skip_next_async()
+
+async def control_previous_session(session):
+    """Skip to previous track on an explicit session."""
+    if session:
+        await session.try_skip_previous_async()
+
 async def detect_media():
     """Detect and list all active media sessions from Windows."""
     sessions = await MediaManager.request_async()
