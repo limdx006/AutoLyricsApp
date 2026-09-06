@@ -69,14 +69,18 @@ def apply_app_icon(window):
 class LogViewerWindow(tk.Toplevel):
     """Resizable, scrollable window showing the last MAX_LOG_LINES captured log messages, updating live as new ones arrive."""
 
+    _WIDTH = 550
+    _HEIGHT = 320
+
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Log Viewer")
-        self.geometry("550x320")
         self.minsize(400, 200)
         self.configure(bg=BG_COLOR)
+        self._center_over(parent)
         apply_app_icon(self)
-        # Groups this window with the main one
+        # Groups this window with the main one (single taskbar entry, raised
+        # together, closes together) so switching to either brings both forward.
         self.transient(parent)
         try:
             self.attributes("-topmost", parent.attributes("-topmost"))
@@ -111,6 +115,18 @@ class LogViewerWindow(tk.Toplevel):
 
         _subscribers.append(self._on_new_line)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _center_over(self, parent):
+        """Position this window centered over the main app window, instead of the screen's top-left default."""
+        parent.update_idletasks()
+        px, py = parent.winfo_x(), parent.winfo_y()
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        x = px + (pw - self._WIDTH) // 2
+        y = py + (ph - self._HEIGHT) // 2
+        # Keep it fully on-screen even if that centering would push it off the edge
+        x = max(0, min(x, self.winfo_screenwidth() - self._WIDTH))
+        y = max(0, min(y, self.winfo_screenheight() - self._HEIGHT))
+        self.geometry(f"{self._WIDTH}x{self._HEIGHT}+{x}+{y}")
 
     def _append_line(self, line):
         self.text.configure(state="normal")
