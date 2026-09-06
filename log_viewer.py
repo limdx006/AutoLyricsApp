@@ -17,6 +17,7 @@ from collections import deque
 from config import *
 
 MAX_LOG_LINES = 50
+ICON_PATH = "icon.ico"  # same icon file used for the main window / built exe
 
 _log_buffer = deque(maxlen=MAX_LOG_LINES)
 _log_lock = threading.Lock()
@@ -57,15 +58,30 @@ def get_log_lines():
         return list(_log_buffer)
 
 
+def apply_app_icon(window):
+    """Apply the shared app icon; silently keeps the default if icon.ico isn't present yet."""
+    try:
+        window.iconbitmap(ICON_PATH)
+    except Exception:
+        pass
+
+
 class LogViewerWindow(tk.Toplevel):
     """Resizable, scrollable window showing the last MAX_LOG_LINES captured log messages, updating live as new ones arrive."""
 
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Log Viewer")
-        self.geometry("420x320")
-        self.minsize(280, 200)
+        self.geometry("550x320")
+        self.minsize(400, 200)
         self.configure(bg=BG_COLOR)
+        apply_app_icon(self)
+        # Groups this window with the main one
+        self.transient(parent)
+        try:
+            self.attributes("-topmost", parent.attributes("-topmost"))
+        except tk.TclError:
+            pass
 
         container = tk.Frame(self, bg=BG_COLOR)
         container.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
@@ -79,7 +95,7 @@ class LogViewerWindow(tk.Toplevel):
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
             insertbackground=COLOR_ACTIVE_FG,
-            font=("Consolas", 10),
+            font=("Consolas", 9),
             yscrollcommand=scrollbar.set,
             state="disabled",
             borderwidth=0,
@@ -127,3 +143,9 @@ def open_log_viewer(parent):
         return _active_window
     _active_window = LogViewerWindow(parent)
     return _active_window
+
+
+def set_pinned(is_pinned):
+    """Sync the log window's always-on-top state with the main window's pin button."""
+    if _active_window is not None and _active_window.winfo_exists():
+        _active_window.attributes("-topmost", is_pinned)

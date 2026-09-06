@@ -2,7 +2,7 @@ import re
 import tkinter as tk
 from config import *
 from auto_nudge import trigger_auto_nudge
-from log_viewer import open_log_viewer
+from log_viewer import open_log_viewer, set_pinned
 
 
 
@@ -170,6 +170,7 @@ class MediaDetails(tk.Frame):
         self.is_pinned = not self.is_pinned
         top = self.winfo_toplevel()
         top.attributes("-topmost", self.is_pinned)
+        set_pinned(self.is_pinned)  # keep the log window's pinned state in sync
         if self.is_pinned:
             self.pin_button.configure(fg=ERROR_COLOR)
         else:

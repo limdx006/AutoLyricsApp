@@ -21,7 +21,7 @@ import sys
 from lyrics_fetcher import lyrics_fetcher
 from media_detect import detect_media
 from gui import LyricsApp
-from log_viewer import install_log_capture
+from log_viewer import install_log_capture, apply_app_icon
 
 install_log_capture()  # tee stdout/stderr into the log buffer as early as possible
 
@@ -35,6 +35,7 @@ async def main():
 
     # Display the GUI
     root = tk.Tk()
+    apply_app_icon(root)
     app = LyricsApp(root, title, artist)
     root.mainloop()
 
