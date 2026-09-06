@@ -80,6 +80,10 @@ class LyricsDisplay(tk.Frame):
 
     """Public API"""
 
+    def show_loading(self, message="Fetching lyrics......"):
+        """Clear any currently displayed lyrics and show a temporary loading message - call this as soon as a new fetch starts, so the old song's lyrics never linger on screen."""
+        self._show_placeholder(message)
+
     def set_lyrics(self, raw_lyrics):
         """Parse raw LRC-format lyrics and render them, ready for time syncing."""
         self._current_index = -1
@@ -89,19 +93,7 @@ class LyricsDisplay(tk.Frame):
         self._lines = parse_lrc_lyrics(raw_lyrics)
 
         if not self._lines:
-            self.canvas.delete("all")
-            self._item_ids = []
-            self._line_top_offsets = []
-            self._line_slot_heights = []
-            self._content_height = 0.0
-            self._placeholder_id = self.canvas.create_text(
-                self._canvas_width // 2,
-                self._canvas_height // 2,
-                text="No lyrics found",
-                fill=COLOR_MUTED_FG,
-                font=(FONT_FAMILY, self.FONT_SIZE_NORMAL),
-                anchor="center",
-            )
+            self._show_placeholder("No lyrics found")
             return
 
         self._render_lines()
@@ -137,6 +129,24 @@ class LyricsDisplay(tk.Frame):
             self._set_current_index(index)
 
     """Internal helpers"""
+
+    def _show_placeholder(self, message):
+        """Clear any rendered lyrics and show a centered status message instead (used for both the loading state and the empty/no-lyrics state)."""
+        self._current_index = -1
+        self.canvas.delete("all")
+        self._lines = []
+        self._item_ids = []
+        self._line_top_offsets = []
+        self._line_slot_heights = []
+        self._content_height = 0.0
+        self._placeholder_id = self.canvas.create_text(
+            self._canvas_width // 2,
+            self._canvas_height // 2,
+            text=message,
+            fill=COLOR_MUTED_FG,
+            font=(FONT_FAMILY, self.FONT_SIZE_NORMAL),
+            anchor="center",
+        )
 
     def _wrap_text(self, text, max_width):
         """Greedily word-wrap text to max_width pixels, measured with self._wrap_font."""

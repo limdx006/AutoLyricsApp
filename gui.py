@@ -76,6 +76,7 @@ class LyricsApp:
         generation token makes sure only the result of the most recently
         requested fetch is ever applied.
         """
+        self.lyrics_display.show_loading()  # clear the previous song's lyrics immediately, before the fetch resolves
         self._lyrics_fetch_generation += 1
         my_generation = self._lyrics_fetch_generation
 
