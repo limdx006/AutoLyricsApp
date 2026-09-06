@@ -162,6 +162,16 @@ async def _rank_sessions(sessions):
     for i, session in enumerate(sessions):
         score, title, artist, app_id = await _score_session(session, i in moving)
         ranked.append((score, title, artist, app_id, session))
+
+    # Prefer shorter titles
+    if ranked:
+        max_len = max(len(row[1]) for row in ranked)
+        for i, row in enumerate(ranked):
+            score, title, artist, app_id, session = row
+            bonus = max(0, max_len - len(title))
+            if bonus:
+                ranked[i] = (score + bonus, title, artist, app_id, session)
+
     ranked.sort(key=lambda row: row[0], reverse=True)
     return ranked
 
