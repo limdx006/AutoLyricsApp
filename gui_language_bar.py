@@ -90,9 +90,10 @@ class LanguageBar(tk.Frame):
     # Display mode shown when the switch is on, per detected language
     _TRANSLATION_MODE = {"Chinese": "PinYin", "Japanese": "Romaji", "Korean": "Romaji"}
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, on_translate_toggle=None, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._current_language = "Unknown"
+        self._on_translate_toggle = on_translate_toggle
 
         # Fixed height = 10% of window height below song details
         self.configure(height=int(WINDOW_HEIGHT * 0.1))
@@ -169,9 +170,11 @@ class LanguageBar(tk.Frame):
             self.language_switch.pack_forget()
 
     def _on_switch_toggle(self, state):
-        """Update the Current: label to match the switch state and detected language."""
+        """Update the Current: label and notify the app to swap the displayed lyrics."""
         mode = self._TRANSLATION_MODE.get(self._current_language, "Original") if state else "Original"
         self.current_value_label.config(text=mode)
+        if self._on_translate_toggle:
+            self._on_translate_toggle(bool(state), self._current_language)
 
     def set_language(self, language_text):
         """Update the detected-language value, reset to Original, and show/hide the switch accordingly."""
