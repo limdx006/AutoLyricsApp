@@ -14,6 +14,8 @@ import syncedlyrics
 import re
 
 MAX_ATTEMPT = 3
+_NO_SONG_TITLE = "Undetected Song"
+_NO_ARTIST = "Unknown Artist"
 
 
 def remove_empty_lines(lyrics: str) -> str:
@@ -33,6 +35,10 @@ def lyrics_fetcher(title, artist):
     """
     Fetch lyrics for the given title and artist using the syncedlyrics library.
     """
+    if not title or not artist or title == _NO_SONG_TITLE or artist == _NO_ARTIST:
+        print(f"[Lyrics] Skipping search - no real song detected ('{title}' by '{artist}')")
+        return None
+
     query = f"{title} {artist}".strip()
     for attempt in range(MAX_ATTEMPT):
         try:
