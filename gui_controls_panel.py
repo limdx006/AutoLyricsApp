@@ -209,13 +209,15 @@ class ControlsPanel(tk.Frame):
                 if self._on_song_change:
                     self._on_song_change(title, artist)
 
-        # Sync play/pause button symbol and timer state with external playback status
+        # Sync play/pause button symbol, status label, and timer state with external playback status
         if status == "playing":
             self.play_pause_button.config(text="\u23f8")  # pause symbol
+            self.status_label.config(text="Playing")
             if not self._local_timer.is_running() and self._has_synced:
                 self._local_timer.start(position)
         elif status in ("paused", "stopped"):
             self.play_pause_button.config(text="\u25B6")  # play symbol
+            self.status_label.config(text="Paused")
             if self._local_timer.is_running():
                 self._local_timer.stop()
 
@@ -281,15 +283,20 @@ class ControlsPanel(tk.Frame):
                 if status == "playing":
                     asyncio.run(control_pause_session(session))
                     new_symbol = "\u25B6"  # play symbol
+                    new_status_text = "Paused"
                     # Freeze the local timer so the displayed position/lyrics stop too
                     self.after(0, self._local_timer.stop)
                 else:
                     asyncio.run(control_play_session(session))
                     new_symbol = "\u23f8"  # pause symbol
+                    new_status_text = "Playing"
                     # Resume the local timer from wherever it was frozen
                     self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))
-                # Update button symbol on main thread
+                # Update button symbol and status label on main thread - gives
+                # instant feedback instead of waiting for the next 500ms poll
+                # to confirm the change.
                 self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
+                self.after(0, lambda: self.status_label.config(text=new_status_text))
             except Exception as e:
                 print(f"Play/pause failed: {e}")
         threading.Thread(target=run, daemon=True).start()
