@@ -42,9 +42,9 @@ def lyrics_fetcher(title, artist):
     query = f"{title} {artist}".strip()
     for attempt in range(MAX_ATTEMPT):
         try:
-            lyrics = syncedlyrics.search(query)
+            lyrics = syncedlyrics.search(query, synced_only = True)
             cleaned = remove_empty_lines(lyrics)
-            print(f"[Lyrics] Retrieved lyrics for '{query}'")
+            print(f"[Lyrics] Retrieved lyrics for '{query}' with {len(cleaned.splitlines())} lines")
             return cleaned  # Return cleaned lyrics
         except Exception:
             print(f"[Lyrics] Attempt {attempt + 1} failed for '{query}'")
@@ -53,4 +53,4 @@ def lyrics_fetcher(title, artist):
 
 
 if __name__ == "__main__":
-    lyrics_fetcher()
+    print(lyrics_fetcher("相思遥", "玉慧同学"))
