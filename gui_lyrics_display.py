@@ -93,7 +93,7 @@ class LyricsDisplay(tk.Frame):
         self._lines = parse_lrc_lyrics(raw_lyrics)
 
         if not self._lines:
-            self._show_placeholder("No lyrics found")
+            self._show_placeholder("Lyrics not found, maybe try another song.")
             return
 
         self._render_lines()
