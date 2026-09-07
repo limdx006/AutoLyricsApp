@@ -40,7 +40,7 @@ def lyrics_fetcher(title, artist):
             cleaned = remove_empty_lines(lyrics)
             print(f"[Lyrics] Retrieved lyrics for '{query}'")
             return cleaned  # Return cleaned lyrics
-        except Exception as e:
+        except Exception:
             print(f"[Lyrics] Attempt {attempt + 1} failed for '{query}'")
             if attempt < MAX_ATTEMPT - 1:
                 time.sleep(1)  # Wait for 1 second before retrying

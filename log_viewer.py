@@ -11,6 +11,7 @@ lyrics fetches, and auto-nudge all happen off the main thread.
 """
 
 import sys
+import re
 import threading
 import tkinter as tk
 from collections import deque
@@ -18,6 +19,24 @@ from config import *
 
 MAX_LOG_LINES = 50
 ICON_PATH = "icon.ico"  # same icon file used for the main window / built exe
+
+# Known noisy library-internal messages to drop entirely (console + log
+# buffer) - these come from syncedlyrics printing individual provider
+# failures directly (e.g. Megalobiz connection timeouts) rather than
+# through Python's logging module, so they can't be silenced via a
+# verbosity setting. Add more patterns here if other libraries turn out
+# to be similarly chatty.
+_SUPPRESSED_PATTERNS = [
+    re.compile(r"error occurred while searching for an LRC", re.IGNORECASE),
+    re.compile(r"HTTPSConnectionPool", re.IGNORECASE),
+    re.compile(r"ConnectTimeoutError", re.IGNORECASE),
+    re.compile(r"Max retries exceeded with url", re.IGNORECASE),
+]
+
+
+def _is_suppressed(line):
+    return any(p.search(line) for p in _SUPPRESSED_PATTERNS)
+
 
 _log_buffer = deque(maxlen=MAX_LOG_LINES)
 _log_lock = threading.Lock()
@@ -32,10 +51,17 @@ class _TeeStream:
         self._original = original_stream
 
     def write(self, text):
-        self._original.write(text)
-        # print() may call write() more than once per statement (message,
-        # then a trailing "\n"), so only capture complete, non-blank lines.
-        for line in text.splitlines():
+        # Drop known-noisy lines entirely, before they reach the console or
+        # the log buffer - filtered per write() call, which keeps this
+        # thread-safe (no shared redirection state across threads).
+        lines = text.split("\n")
+        kept_lines = [line for line in lines if not _is_suppressed(line)]
+        filtered_text = "\n".join(kept_lines)
+
+        if filtered_text:
+            self._original.write(filtered_text)
+
+        for line in kept_lines:
             if line.strip():
                 with _log_lock:
                     _log_buffer.append(line)
