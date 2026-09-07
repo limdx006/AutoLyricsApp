@@ -22,17 +22,19 @@ class LyricsDisplay(tk.Frame):
     the whole list from visually jumping around as playback progresses.
     """
 
-    # Vertical gap (px) added between each lyric line, on top of its own
-    # text height. Adjust this to make lines feel more/less cramped.
+    # Vertical gap (px) added between each lyric line,
     LINE_GAP = 20
 
-    FONT_SIZE_NORMAL = 12
-    FONT_SIZE_ACTIVE = 17
+    # Default active/nearby/far font sizes
+    FONT_SIZE_ACTIVE_DEFAULT = 16
+    FONT_SIZE_NEARBY_DEFAULT = 13
+    FONT_SIZE_FAR_DEFAULT = 12
     # How many lines out on either side still get the "nearby" shade
-    # before falling back to the dimmest "far" shade.
     NEARBY_RANGE = 1
-    # Scroll easing factor: fraction of the remaining distance covered
-    # on each animation tick (higher = snappier, lower = smoother/slower).
+    """
+    Scroll easing factor: fraction of the remaining distance covered on each animation tick 
+    (higher = snappier, lower = smoother/slower).
+    """    
     SCROLL_EASE = 0.25
 
     def __init__(self, parent, **kwargs):
@@ -42,10 +44,15 @@ class LyricsDisplay(tk.Frame):
         self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
+        # Instance-level so they can be changed live via set_font_sizes()
+        self._font_size_active = self.FONT_SIZE_ACTIVE_DEFAULT
+        self._font_size_nearby = self.FONT_SIZE_NEARBY_DEFAULT
+        self._font_size_far = self.FONT_SIZE_FAR_DEFAULT
+
         # Font used purely to measure/pre-wrap text - always the largest
         # size a line can appear at, so wrapping never changes on highlight.
         self._wrap_font = tkfont.Font(
-            family=FONT_FAMILY, size=self.FONT_SIZE_ACTIVE, weight="bold"
+            family=FONT_FAMILY, size=self._font_size_active, weight="bold"
         )
 
         self._lines = []  # list of (seconds, raw_text), timestamp-free
@@ -74,7 +81,7 @@ class LyricsDisplay(tk.Frame):
             0,
             text="Lyrics will be displayed here",
             fill=COLOR_MUTED_FG,
-            font=(FONT_FAMILY, self.FONT_SIZE_NORMAL),
+            font=(FONT_FAMILY, self._font_size_nearby),
             anchor="center",
         )
 
@@ -128,6 +135,26 @@ class LyricsDisplay(tk.Frame):
         if index != self._current_index:
             self._set_current_index(index)
 
+    def set_font_sizes(self, active, nearby, far):
+        """
+        Update the active/nearby/far font sizes (e.g. from the settings
+        window's font-size preset list) and re-render with them applied.
+
+        The wrap font is resized in place - since it always tracks the
+        active size (the largest a line can appear at), this keeps
+        wrapping consistent with the new sizes rather than reusing stale
+        wrap widths from before the change.
+        """
+        if (active, nearby, far) == (self._font_size_active, self._font_size_nearby, self._font_size_far):
+            return
+        self._font_size_active = active
+        self._font_size_nearby = nearby
+        self._font_size_far = far
+        self._wrap_font.configure(size=active)
+        if self._lines:
+            self._render_lines()
+            self._set_current_index(max(self._current_index, 0), animate=False)
+
     """Internal helpers"""
 
     def _show_placeholder(self, message):
@@ -144,7 +171,7 @@ class LyricsDisplay(tk.Frame):
             self._canvas_height // 2,
             text=message,
             fill=COLOR_MUTED_FG,
-            font=(FONT_FAMILY, self.FONT_SIZE_NORMAL),
+            font=(FONT_FAMILY, self._font_size_nearby),
             anchor="center",
         )
 
@@ -194,7 +221,7 @@ class LyricsDisplay(tk.Frame):
                 center_y,
                 text=wrapped_text,
                 fill=COLOR_FAR_FG,
-                font=(FONT_FAMILY, self.FONT_SIZE_NORMAL),
+                font=(FONT_FAMILY, self._font_size_far),
                 anchor="center",
                 justify="center",
             )
@@ -221,13 +248,13 @@ class LyricsDisplay(tk.Frame):
             distance = abs(i - index)
             if distance == 0:
                 fill = COLOR_ACTIVE_FG
-                font = (FONT_FAMILY, self.FONT_SIZE_ACTIVE, "bold")
+                font = (FONT_FAMILY, self._font_size_active, "bold")
             elif distance <= self.NEARBY_RANGE:
                 fill = COLOR_NEARBY_FG
-                font = (FONT_FAMILY, self.FONT_SIZE_NORMAL)
+                font = (FONT_FAMILY, self._font_size_nearby)
             else:
                 fill = COLOR_FAR_FG
-                font = (FONT_FAMILY, self.FONT_SIZE_NORMAL)
+                font = (FONT_FAMILY, self._font_size_far)
             self.canvas.itemconfig(item_id, fill=fill, font=font)
         self._scroll_to_current(animate=animate)
 

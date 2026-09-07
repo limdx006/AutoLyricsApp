@@ -10,6 +10,7 @@ from lyrics_fetcher import lyrics_fetcher
 from language_detect import detect_lyrics_language
 from lyrics_translator import translate_lyrics
 from auto_nudge import trigger_auto_nudge
+from setting import open_settings_window
 
 
 class LyricsApp:
@@ -20,6 +21,13 @@ class LyricsApp:
         # Per-song lyric cache: original always kept once fetched
         self._current_raw_lyrics = None
         self._translated_lyrics_cache = None
+        # Tracked so the settings window knows which presets are currently selected and can highlight them accordingly
+        self._current_window_size = (WINDOW_WIDTH, WINDOW_HEIGHT)
+        self._current_font_sizes = {
+            "active": LyricsDisplay.FONT_SIZE_ACTIVE_DEFAULT,
+            "nearby": LyricsDisplay.FONT_SIZE_NEARBY_DEFAULT,
+            "far": LyricsDisplay.FONT_SIZE_FAR_DEFAULT,
+        }
         self.root.title("Lyrics Player")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(False, False)
@@ -32,6 +40,7 @@ class LyricsApp:
             # defers the attribute lookup until the offset actually changes
             # (i.e. after __init__ has finished and everything is built).
             on_offset_change=lambda offset: self.lyrics_display.set_offset(offset),
+            on_open_settings=self._open_settings,
         )
         self.media_details.pack(side=tk.TOP, fill=tk.X)
 
@@ -121,3 +130,24 @@ class LyricsApp:
             self.lyrics_display.set_lyrics(self._translated_lyrics_cache)
         else:
             self.lyrics_display.set_lyrics(self._current_raw_lyrics)
+
+    def _open_settings(self):
+        """Called by the ⚙ settings button: open the settings window, wired to apply changes immediately."""
+        open_settings_window(
+            self.root,
+            current_window_size=self._current_window_size,
+            current_font_sizes=self._current_font_sizes,
+            on_window_size_change=self._apply_window_size,
+            on_font_size_change=self._apply_font_sizes,
+        )
+
+    def _apply_window_size(self, size):
+        """Called when a window-size preset is selected in the settings window."""
+        self._current_window_size = size
+        width, height = size
+        self.root.geometry(f"{width}x{height}")
+
+    def _apply_font_sizes(self, sizes):
+        """Called when a font-size preset is selected in the settings window."""
+        self._current_font_sizes = sizes
+        self.lyrics_display.set_font_sizes(sizes["active"], sizes["nearby"], sizes["far"])

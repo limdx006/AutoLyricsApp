@@ -2,23 +2,25 @@ import re
 import tkinter as tk
 from config import *
 from auto_nudge import trigger_auto_nudge
-from log_viewer import open_log_viewer, set_pinned
+from log_viewer import open_log_viewer, set_pinned as set_log_pinned
+from setting import set_pinned as set_settings_pinned
 
 
 
-# Matches everything the offset entry should accept while typing: an
-# optional leading '-' (offset can go negative), digits, and at most one
-# '.'. Also allows "" and "-" alone so the field can be cleared / a minus
-# typed first without getting rejected mid-edit.
+"""Matches everything the offset entry should accept while typing: an
+optional leading '-' (offset can go negative), digits, and at most one
+'.'. Also allows "" and "-" alone so the field can be cleared / a minus
+typed first without getting rejected mid-edit."""
 _OFFSET_INPUT_PATTERN = re.compile(r"^-?\d*\.?\d*$")
 
 
 class MediaDetails(tk.Frame):
     """Top section of the player: Media name, artist and multiple feature buttons"""
 
-    def __init__(self, parent, title="Song name here", artist="artist name", on_offset_change=None, **kwargs):
+    def __init__(self, parent, title="Song name here", artist="artist name", on_offset_change=None, on_open_settings=None, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._on_offset_change = on_offset_change
+        self._on_open_settings = on_open_settings
 
         # Fixed height = 30% of window height
         self.configure(height=int(WINDOW_HEIGHT * 0.3))
@@ -118,6 +120,11 @@ class MediaDetails(tk.Frame):
         self.settings_button = self.create_button(
             "\u2699", 1, 2, sticky="n"
         )  # ⚙ is U+2699
+        self.settings_button.configure(command=self._handle_open_settings)
+
+    def _handle_open_settings(self):
+        if self._on_open_settings:
+            self._on_open_settings()
 
     def _validate_offset_input(self, proposed_value):
         """Key-validation callback for the offset entry (validate="key")."""
@@ -170,7 +177,8 @@ class MediaDetails(tk.Frame):
         self.is_pinned = not self.is_pinned
         top = self.winfo_toplevel()
         top.attributes("-topmost", self.is_pinned)
-        set_pinned(self.is_pinned)  # keep the log window's pinned state in sync
+        set_log_pinned(self.is_pinned)       # keep the log window's pinned state in sync
+        set_settings_pinned(self.is_pinned)  # keep the settings window's pinned state in sync
         if self.is_pinned:
             self.pin_button.configure(fg=ERROR_COLOR)
         else:
