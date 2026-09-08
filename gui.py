@@ -17,7 +17,6 @@ class LyricsApp:
     def __init__(self, root, title="Song name here", artist="artist name"):
         self.root = root
         self._lyrics_fetch_generation = 0
-        self._first_run = True
         # Per-song lyric cache: original always kept once fetched
         self._current_raw_lyrics = None
         self._translated_lyrics_cache = None
@@ -111,9 +110,9 @@ class LyricsApp:
 
             self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()
-        if self._first_run:
-            trigger_auto_nudge(0.1)  # Trigger auto nudge on first run to refresh media session
-            self._first_run = False  # Reset the first run flag after the initial fetch
+        
+        print("[Nudge] Triggering auto nudge after lyrics fetch")
+        trigger_auto_nudge(0.2)  # Trigger auto nudge on first run to refresh media session
 
     def _handle_translate_toggle(self, is_translated, language):
         """Called when the language bar's toggle flips: swap between the

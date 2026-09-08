@@ -17,10 +17,14 @@ def auto_nudge(duration):
             # wait for the specified duration then resume
             time.sleep(duration)
             asyncio.run(control_play())
+            time.sleep(0.5)  # Give the media player a moment to update its state
+            status = asyncio.run(get_playback_status())
             if status == "playing":
                 print("[Nudge] Resume successfully")
             else:
                 print("[Nudge] Resume failed")
+                print("[Nudge] Retrying auto nudge")
+                trigger_auto_nudge(0.5)  # Retry if resume failed
     except Exception as e:
         print(f"[Nudge] Auto nudge failed: {e}")
 

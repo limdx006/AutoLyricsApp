@@ -30,7 +30,7 @@ _MOVEMENT_SAMPLE_GAP = 0.35  # seconds between those two samples
 
 _BLACKLISTED_APPS = {
     "teams", "zoom", "discord", "slack", "skype", "obs",
-    "mpc-hc", "vlc", "wmplayer", "riot", "douyin",
+    "mpc-hc", "vlc", "wmplayer", "riot", "douyin", "telegram", "messenger"
 }
 
 _MUSIC_APP_ALLOWLIST = {
