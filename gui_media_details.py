@@ -21,6 +21,10 @@ class MediaDetails(tk.Frame):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._on_offset_change = on_offset_change
         self._on_open_settings = on_open_settings
+        # Mutable so the settings window's default-offset field can change
+        # what future song-changes reset to, without touching the offset
+        # currently in effect for whatever song is playing right now.
+        self._default_offset = DEFAULT_OFFSET
 
         # Fixed height = 30% of window height
         self.configure(height=int(WINDOW_HEIGHT * 0.3))
@@ -204,21 +208,28 @@ class MediaDetails(tk.Frame):
             return 0.0
 
     def _adjust_offset(self, delta: float):
-        """Adjust the offset value by *delta* and clamp it within [-99.0, 99.0]."""
+        """Adjust the offset value by *delta* and clamp it within [OFFSET_MIN, OFFSET_MAX]."""
         # Get current value, apply delta, clamp to allowed range
         new_val = round(self.offset_var.get() + delta, 2)
-        if new_val < -99.0:
-            new_val = -99.0
-        if new_val > 99.0:
-            new_val = 99.0
+        if new_val < OFFSET_MIN:
+            new_val = OFFSET_MIN
+        if new_val > OFFSET_MAX:
+            new_val = OFFSET_MAX
         self.offset_var.set(new_val)
 
+    def set_default_offset(self, value):
+        """Update what future reset_offset() calls (i.e. song changes) reset
+        to - called from the settings window. Doesn't touch the offset
+        currently in effect for whatever song is playing right now."""
+        self._default_offset = value
+
     def reset_offset(self):
-        """Reset the lyric offset back to DEFAULT_OFFSET (e.g. on a new song).
-        Setting the var fires the existing trace, which propagates the reset
-        to the lyrics display via on_offset_change - no other wiring needed.
+        """Reset the lyric offset back to the current default offset (e.g.
+        on a new song). Setting the var fires the existing trace, which
+        propagates the reset to the lyrics display via on_offset_change -
+        no other wiring needed.
         """
-        self.offset_var.set(DEFAULT_OFFSET)
+        self.offset_var.set(self._default_offset)
 
     def update_song_info(self, title, artist):
         """Update the displayed song title and artist, and reset the lyric

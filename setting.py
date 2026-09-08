@@ -8,6 +8,7 @@ transient (grouped/raised together), centered over it on open, and its
 always-on-top state kept in sync with the main window's pin button.
 """
 
+import re
 import tkinter as tk
 from config import *
 from log_viewer import apply_app_icon
@@ -176,13 +177,84 @@ class _CustomEntryRow(tk.Frame):
         )
 
 
+class _SingleValueEntry(tk.Frame):
+    """
+    A single standalone float-value row (label + one entry box + Apply
+    button), restricted to at most one decimal place - no preset list
+    alongside it, just a plain settable value. Committing (Enter,
+    focus-out, or the Apply button) with a valid number clamps it to
+    value_range, rounds to one decimal, reflects that back into the box,
+    and fires on_commit.
+    """
+
+    def __init__(self, parent, label, value_range, initial_value, on_commit, field_width=6, **kwargs):
+        super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
+        self._on_commit = on_commit
+        self._value_range = value_range
+
+        tk.Label(
+            self, text=label, font=(FONT_FAMILY, 10),
+            bg=ACCENT_COLOR, fg=COLOR_NEARBY_FG,
+        ).pack(side="left", padx=(8, 4), pady=4)
+
+        vcmd = (self.register(self._validate_one_decimal), "%P")
+        self._var = tk.StringVar(value=self._format(initial_value))
+        entry = tk.Entry(
+            self, textvariable=self._var, width=field_width, justify="center",
+            validate="key", validatecommand=vcmd,
+        )
+        entry.pack(side="left", padx=2)
+        entry.bind("<Return>", lambda e: self._try_commit())
+        entry.bind("<FocusOut>", lambda e: self._try_commit())
+
+        self._apply_button = tk.Button(
+            self,
+            text="Apply",
+            font=(FONT_FAMILY, 9),
+            command=self._try_commit,
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            bg=COLOR_ACTIVE_FG,
+            fg=COLOR_FAR_FG,
+            activebackground=COLOR_FAR_FG,
+            activeforeground=COLOR_ACTIVE_FG,
+            padx=6,
+            pady=1,
+        )
+        self._apply_button.pack(side="right", padx=(4, 8))
+        self._apply_button.bind("<Enter>", lambda e: e.widget.configure(bg=COLOR_ARTIST_FG))
+        self._apply_button.bind("<Leave>", lambda e: e.widget.configure(bg=COLOR_ACTIVE_FG))
+
+    @staticmethod
+    def _format(value):
+        return f"{value:.1f}"
+
+    def _validate_one_decimal(self, proposed):
+        """Key-validation: optional leading '-', digits, optional '.', at most one digit after it."""
+        if proposed in ("", "-"):
+            return True  # allow while typing - not committable yet, but shouldn't block the keystroke
+        return bool(re.fullmatch(r"-?\d*\.?\d?", proposed))
+
+    def _try_commit(self):
+        try:
+            value = float(self._var.get())
+        except ValueError:
+            return  # incomplete (e.g. just "-" or ".") - wait for a real number
+        lo, hi = self._value_range
+        value = round(max(lo, min(hi, value)), 1)
+        self._var.set(self._format(value))
+        self._on_commit(value)
+
+
 class SettingsWindow(tk.Toplevel):
     """Preferences window: window-size and font-size preset lists."""
 
     _WIDTH = 320
-    _HEIGHT = 480
+    _HEIGHT = 560
 
-    def __init__(self, parent, current_window_size, current_font_sizes, on_window_size_change, on_font_size_change):
+    def __init__(self, parent, current_window_size, current_font_sizes, current_default_offset,
+                 on_window_size_change, on_font_size_change, on_default_offset_change):
         super().__init__(parent)
         self.title("Settings")
         self.resizable(False, False)
@@ -236,6 +308,20 @@ class SettingsWindow(tk.Toplevel):
         font_list._on_activate = lambda: font_custom.set_selected(False)
         self._font_list, self._font_custom = font_list, font_custom
 
+        tk.Label(
+            self, text="Default Lyric Offset (s)", font=(FONT_FAMILY, 11, "bold"),
+            bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
+        ).pack(anchor="w", padx=12, pady=(16, 4))
+
+        offset_row = _SingleValueEntry(
+            self, "Offset:", value_range=(OFFSET_MIN, OFFSET_MAX),
+            initial_value=current_default_offset,
+            on_commit=on_default_offset_change,
+            field_width=6,
+        )
+        offset_row.pack(fill=tk.X, padx=12, pady=(0, 12))
+        self._offset_row = offset_row
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     @staticmethod
@@ -265,7 +351,8 @@ class SettingsWindow(tk.Toplevel):
         self.destroy()
 
 
-def open_settings_window(parent, current_window_size, current_font_sizes, on_window_size_change, on_font_size_change):
+def open_settings_window(parent, current_window_size, current_font_sizes, current_default_offset,
+                          on_window_size_change, on_font_size_change, on_default_offset_change):
     """Open the settings window, or focus the existing one if already open."""
     global _active_window
     if _active_window is not None and _active_window.winfo_exists():
@@ -273,7 +360,8 @@ def open_settings_window(parent, current_window_size, current_font_sizes, on_win
         _active_window.focus_force()
         return _active_window
     _active_window = SettingsWindow(
-        parent, current_window_size, current_font_sizes, on_window_size_change, on_font_size_change
+        parent, current_window_size, current_font_sizes, current_default_offset,
+        on_window_size_change, on_font_size_change, on_default_offset_change,
     )
     return _active_window
 

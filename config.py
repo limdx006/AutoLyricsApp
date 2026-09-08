@@ -22,6 +22,8 @@ OFFSET_BUTTON_SIZE = 20
 
 # Config setting preset
 DEFAULT_OFFSET = 0.3
+OFFSET_MIN = -99.0
+OFFSET_MAX = 99.0
 
 WINDOW_SIZE_PRESETS = [
     ("Small  — 340 × 640", (340, 640)),

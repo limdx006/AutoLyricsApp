@@ -27,6 +27,7 @@ class LyricsApp:
             "nearby": LyricsDisplay.FONT_SIZE_NEARBY_DEFAULT,
             "far": LyricsDisplay.FONT_SIZE_FAR_DEFAULT,
         }
+        self._current_default_offset = DEFAULT_OFFSET
         self.root.title("Lyrics Player")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.resizable(False, False)
@@ -136,8 +137,10 @@ class LyricsApp:
             self.root,
             current_window_size=self._current_window_size,
             current_font_sizes=self._current_font_sizes,
+            current_default_offset=self._current_default_offset,
             on_window_size_change=self._apply_window_size,
             on_font_size_change=self._apply_font_sizes,
+            on_default_offset_change=self._apply_default_offset,
         )
 
     def _apply_window_size(self, size):
@@ -150,3 +153,11 @@ class LyricsApp:
         """Called when a font-size preset is selected in the settings window."""
         self._current_font_sizes = sizes
         self.lyrics_display.set_font_sizes(sizes["active"], sizes["nearby"], sizes["far"])
+
+    def _apply_default_offset(self, value):
+        """Called when the settings window's default-offset field is committed.
+        Only changes what future song-changes reset to - doesn't touch the
+        offset currently in effect for whatever song is playing right now.
+        """
+        self._current_default_offset = value
+        self.media_details.set_default_offset(value)
