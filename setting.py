@@ -132,6 +132,27 @@ class _CustomEntryRow(tk.Frame):
             entry.bind("<FocusOut>", lambda e: self._try_commit())
             self._vars.append(var)
 
+        # Explicit "Apply" button - same effect as pressing Enter in a
+        # field, just a more discoverable trigger for applying custom values.
+        self._apply_button = tk.Button(
+            self,
+            text="Apply",
+            font=(FONT_FAMILY, 9),
+            command=self._try_commit,
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            bg=COLOR_ACTIVE_FG,
+            fg=COLOR_FAR_FG,
+            activebackground=COLOR_FAR_FG,
+            activeforeground=COLOR_ACTIVE_FG,
+            padx=6,
+            pady=1,
+        )
+        self._apply_button.pack(side="right", padx=(4, 8))
+        self._apply_button.bind("<Enter>", lambda e: e.widget.configure(bg=COLOR_ARTIST_FG))
+        self._apply_button.bind("<Leave>", lambda e: e.widget.configure(bg=COLOR_ACTIVE_FG))
+
     def _validate_digits(self, proposed):
         """Key-validation: digits only. Empty is allowed too, so the field can be cleared while typing."""
         return proposed == "" or proposed.isdigit()
@@ -186,7 +207,7 @@ class SettingsWindow(tk.Toplevel):
         size_list.pack(fill=tk.X, padx=12)
         size_custom = _CustomEntryRow(
             self, "Custom -", field_count=2, separator=" x ", value_range=(100, 3000),
-            initial_values=current_window_size if size_index is None else None,
+            initial_values=current_window_size,
             on_commit=on_window_size_change,
             on_activate=lambda: size_list.deselect_all(),
             field_width=5,
@@ -203,9 +224,7 @@ class SettingsWindow(tk.Toplevel):
         font_index = self._match_index(FONT_SIZE_PRESETS, current_font_sizes)
         font_list = _PresetList(self, FONT_SIZE_PRESETS, font_index if font_index is not None else -1, on_select=on_font_size_change)
         font_list.pack(fill=tk.X, padx=12)
-        font_initial = None
-        if font_index is None and current_font_sizes:
-            font_initial = (current_font_sizes["active"], current_font_sizes["nearby"], current_font_sizes["far"])
+        font_initial = (current_font_sizes["active"], current_font_sizes["nearby"], current_font_sizes["far"]) if current_font_sizes else None
         font_custom = _CustomEntryRow(
             self, "Custom -", field_count=3, separator=" / ", value_range=(1, 99),
             initial_values=font_initial,
