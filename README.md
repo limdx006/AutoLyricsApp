@@ -67,8 +67,8 @@ A real-time desktop lyrics player built with Python that detects the currently p
 
 ### ⚙️ Settings Window
 - Opens as a modal preference window from the ⚙ button
-- **Window size** — 5 presets from Small (340×640) to XLarge (600×1000), plus a free-form custom input (width 300–800, height 500–1200)
-- **Lyric font size** — 4 presets from Small to XLarge controlling active, nearby, and far line sizes independently, plus a custom input for all three values
+- **Window size** — 5 presets from Small (340×640) to XLarge (600×1000), plus a custom input (width and height 100–3000)
+- **Lyric font size** — 4 presets from Small to XLarge controlling active, nearby, and far line sizes independently, plus a custom input for all three values (1–99)
 - All changes apply immediately so the effect is visible before closing
 - Current values are pre-selected when the window opens
 
