@@ -4,7 +4,7 @@ PyInstaller.__main__.run([
     'main.py',                          # Entry point
     '--onefile',                        # Single .exe file
     '--windowed',                       # No console window (GUI app)
-    '--name', 'LyricsPlayer',           # Output filename
+    '--name', 'LyricsPlayer 4.0',           # Output filename
 
     # Source files
     '--add-data', 'config.py;.',
