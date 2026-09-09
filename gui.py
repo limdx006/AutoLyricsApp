@@ -113,11 +113,6 @@ class LyricsApp:
             self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()
 
-        """Nudge the specific session media_selector picked for this song,
-        not whatever Windows itself calls "current" - important once
-        multiple sessions are active, since the "current" concept can
-        drift mid-nudge and end up pausing one session while resuming
-        a completely different one (see auto_nudge.py)."""
         print("[Nudge] Triggering auto nudge after lyrics fetch")
         trigger_auto_nudge(0.2, session=self.controls.get_current_session())
 
