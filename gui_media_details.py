@@ -17,10 +17,11 @@ _OFFSET_INPUT_PATTERN = re.compile(r"^-?\d*\.?\d*$")
 class MediaDetails(tk.Frame):
     """Top section of the player: Media name, artist and multiple feature buttons"""
 
-    def __init__(self, parent, title="Song name here", artist="artist name", on_offset_change=None, on_open_settings=None, **kwargs):
+    def __init__(self, parent, title="Song name here", artist="artist name", on_offset_change=None, on_open_settings=None, on_refresh=None, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._on_offset_change = on_offset_change
         self._on_open_settings = on_open_settings
+        self._on_refresh = on_refresh
         # Mutable so the settings window's default-offset field can change
         # what future song-changes reset to, without touching the offset
         # currently in effect for whatever song is playing right now.
@@ -51,7 +52,7 @@ class MediaDetails(tk.Frame):
         self.refresh_button = self.create_button(
             "\u27f3", 1, 0, font_size=18, sticky="n"
         )  # ⟳ is U+27F3
-        self.refresh_button.configure(command=trigger_auto_nudge)
+        self.refresh_button.configure(command=self._handle_refresh)
 
         # Middle column: Song name and artist name (stacked vertically)
         middle_frame = tk.Frame(self, bg=ACCENT_COLOR)
@@ -129,6 +130,15 @@ class MediaDetails(tk.Frame):
     def _handle_open_settings(self):
         if self._on_open_settings:
             self._on_open_settings()
+
+    def _handle_refresh(self):
+        """Refresh button: delegate to the app if it can supply the
+        currently selected session, otherwise fall back to the legacy
+        generic nudge (e.g. before any session has been selected yet)."""
+        if self._on_refresh:
+            self._on_refresh()
+        else:
+            trigger_auto_nudge()
 
     def _validate_offset_input(self, proposed_value):
         """Key-validation callback for the offset entry (validate="key")."""

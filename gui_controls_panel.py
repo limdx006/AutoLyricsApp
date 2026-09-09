@@ -254,6 +254,11 @@ class ControlsPanel(tk.Frame):
         if self._on_time_update:
             self._on_time_update(position)
 
+    def get_current_session(self):
+        """Return the winsdk session object currently selected by
+        media_selector (or None)."""
+        return self._current_session
+
     def _on_previous(self):
         """Handle previous track button click - acts on the currently selected session."""
         session = self._current_session

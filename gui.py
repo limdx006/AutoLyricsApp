@@ -41,6 +41,7 @@ class LyricsApp:
             # (i.e. after __init__ has finished and everything is built).
             on_offset_change=lambda offset: self.lyrics_display.set_offset(offset),
             on_open_settings=self._open_settings,
+            on_refresh=self._handle_manual_refresh,
         )
         self.media_details.pack(side=tk.TOP, fill=tk.X)
 
@@ -111,9 +112,18 @@ class LyricsApp:
 
             self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()
-        
+
+        """Nudge the specific session media_selector picked for this song,
+        not whatever Windows itself calls "current" - important once
+        multiple sessions are active, since the "current" concept can
+        drift mid-nudge and end up pausing one session while resuming
+        a completely different one (see auto_nudge.py)."""
         print("[Nudge] Triggering auto nudge after lyrics fetch")
-        trigger_auto_nudge(0.2)  # Trigger auto nudge on first run to refresh media session
+        trigger_auto_nudge(0.2, session=self.controls.get_current_session())
+
+    def _handle_manual_refresh(self):
+        """Refresh button: nudge the currently selected session specifically."""
+        trigger_auto_nudge(session=self.controls.get_current_session())
 
     def _handle_translate_toggle(self, is_translated, language):
         """Called when the language bar's toggle flips: swap between the
