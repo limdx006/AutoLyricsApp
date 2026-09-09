@@ -14,11 +14,14 @@ import sys
 import re
 import threading
 import tkinter as tk
+import ctypes
+import os
 from collections import deque
 from config import *
 
 MAX_LOG_LINES = 50
-ICON_PATH = "icon.ico"  # same icon file used for the main window / built exe
+ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+APP_USER_MODEL_ID = "AutoLyricsApp.AutoLyricsPlayer"
 
 # Known noisy library-internal messages to drop entirely (console + log
 # buffer) - these come from syncedlyrics printing individual provider
@@ -76,6 +79,12 @@ def install_log_capture():
     """Redirect stdout/stderr through the tee. Call once, as early as possible at startup."""
     sys.stdout = _TeeStream(sys.stdout)
     sys.stderr = _TeeStream(sys.stderr)
+
+
+def configure_taskbar_identity():
+    """Give Windows a stable identity so the taskbar uses this app's icon."""
+    if os.name == "nt":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
 
 
 def get_log_lines():

@@ -13,6 +13,8 @@ import time
 import syncedlyrics
 import re
 
+from auto_nudge import trigger_auto_nudge
+
 MAX_ATTEMPT = 3
 _NO_SONG_TITLE = "Undetected Song"
 _NO_ARTIST = "Unknown Artist"
@@ -31,7 +33,7 @@ def remove_empty_lines(lyrics: str) -> str:
     return "\n".join(cleaned_lines)
 
 
-def lyrics_fetcher(title, artist):
+def lyrics_fetcher(title, artist, session=None):
     """
     Fetch lyrics for the given title and artist using the syncedlyrics library.
     """
@@ -45,6 +47,9 @@ def lyrics_fetcher(title, artist):
             lyrics = syncedlyrics.search(query, synced_only = True)
             cleaned = remove_empty_lines(lyrics)
             print(f"[Lyrics] Retrieved lyrics for '{query}' with {len(cleaned.splitlines())} lines")
+            if session is not None:
+                print("[Nudge] Triggering auto nudge after lyrics fetch")
+                trigger_auto_nudge(0.2, session=session)
             return cleaned  # Return cleaned lyrics
         except Exception:
             print(f"[Lyrics] Attempt {attempt + 1} failed for '{query}'")

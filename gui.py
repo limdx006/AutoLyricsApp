@@ -89,10 +89,15 @@ class LyricsApp:
         self.lyrics_display.show_loading()  # clear the previous song's lyrics immediately, before the fetch resolves
         self._lyrics_fetch_generation += 1
         my_generation = self._lyrics_fetch_generation
+        selected_session = self.controls.get_current_session()
 
         def fetch():
             try:
-                lyrics = lyrics_fetcher(title, artist)
+                lyrics = lyrics_fetcher(
+                    title,
+                    artist,
+                    session=selected_session,
+                )
             except Exception as e:
                 print(f"Lyrics fetch failed: {e}")
                 lyrics = None
@@ -112,9 +117,6 @@ class LyricsApp:
 
             self.root.after(0, apply)
         threading.Thread(target=fetch, daemon=True).start()
-
-        print("[Nudge] Triggering auto nudge after lyrics fetch")
-        trigger_auto_nudge(0.2, session=self.controls.get_current_session())
 
     def _handle_manual_refresh(self):
         """Refresh button: nudge the currently selected session specifically."""
