@@ -139,6 +139,10 @@ class LanguageBar(tk.Frame):
             fg=COLOR_ACTIVE_FG,
         )
         self.language_switch = ToggleSwitch(self.switch_frame, bg=ACCENT_COLOR, on_toggle=self._on_switch_toggle)
+        self._translation_tooltip = None
+        self._translation_tooltip_after = None
+        self.language_switch.bind("<Enter>", self._schedule_translation_tooltip)
+        self.language_switch.bind("<Leave>", self._hide_translation_tooltip)
         self._set_switch_visible(False)
 
         # Right side: Current label and value
@@ -168,6 +172,48 @@ class LanguageBar(tk.Frame):
         else:
             self._translate_label.pack_forget()
             self.language_switch.pack_forget()
+
+    def _schedule_translation_tooltip(self, _event=None):
+        """Show the translation options after the pointer rests on the switch."""
+        self._hide_translation_tooltip()
+        self._translation_tooltip_after = self.after(350, self._show_translation_tooltip)
+
+    def _show_translation_tooltip(self):
+        self._translation_tooltip_after = None
+        if self._translation_tooltip is not None or not self.language_switch.winfo_ismapped():
+            return
+
+        tooltip = tk.Toplevel(self)
+        tooltip.wm_overrideredirect(True)
+        tooltip.attributes("-topmost", True)
+        tooltip.configure(bg=COLOR_ACTIVE_FG)
+        tk.Label(
+            tooltip,
+            text="Translation toggle\n- Japanese > Romaji\n- Korean > Romaji\n- Chinese > PinYin",
+            justify=tk.LEFT,
+            anchor="w",
+            padx=7,
+            pady=5,
+            font=(FONT_FAMILY, 8),
+            bg=COLOR_ACTIVE_FG,
+            fg=ACCENT_COLOR,
+            relief=tk.SOLID,
+            borderwidth=1,
+        ).pack()
+
+        x = self.language_switch.winfo_rootx() + self.language_switch.winfo_width() + 6
+        y = self.language_switch.winfo_rooty() + self.language_switch.winfo_height() + 4
+        tooltip.geometry(f"+{x}+{y}")
+        self._translation_tooltip = tooltip
+
+    def _hide_translation_tooltip(self, _event=None):
+        """Cancel or close the translation options tooltip."""
+        if self._translation_tooltip_after is not None:
+            self.after_cancel(self._translation_tooltip_after)
+            self._translation_tooltip_after = None
+        if self._translation_tooltip is not None:
+            self._translation_tooltip.destroy()
+            self._translation_tooltip = None
 
     def _on_switch_toggle(self, state):
         """Update the Current: label and notify the app to swap the displayed lyrics."""
