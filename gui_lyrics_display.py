@@ -160,6 +160,9 @@ class LyricsDisplay(tk.Frame):
     def _show_placeholder(self, message):
         """Clear any rendered lyrics and show a centered status message instead (used for both the loading state and the empty/no-lyrics state)."""
         self._current_index = -1
+        self._scroll_fraction = 0.0
+        self._scroll_target = 0.0
+        self._scroll_animating = False
         self.canvas.delete("all")
         self._lines = []
         self._item_ids = []
@@ -174,6 +177,19 @@ class LyricsDisplay(tk.Frame):
             font=(FONT_FAMILY, self._font_size_nearby),
             anchor="center",
         )
+        self._center_placeholder()
+
+    def _center_placeholder(self):
+        """Keep the loading or empty-state message centered and fully visible."""
+        width = max(self._canvas_width, self.canvas.winfo_width())
+        height = max(self._canvas_height, self.canvas.winfo_height())
+        if width <= 1 or height <= 1:
+            return
+        self._canvas_width = width
+        self._canvas_height = height
+        self.canvas.coords(self._placeholder_id, width // 2, height // 2)
+        self.canvas.configure(scrollregion=(0, 0, width, height))
+        self.canvas.yview_moveto(0.0)
 
     def _wrap_text(self, text, max_width):
         """Greedily word-wrap text to max_width pixels, measured with self._wrap_font."""
@@ -263,9 +279,7 @@ class LyricsDisplay(tk.Frame):
         self._canvas_height = event.height
 
         if not self._lines:
-            self.canvas.coords(
-                self._placeholder_id, self._canvas_width // 2, self._canvas_height // 2
-            )
+            self._center_placeholder()
             return
 
         # Width changed, so re-wrap and re-lay-out every line from scratch.
