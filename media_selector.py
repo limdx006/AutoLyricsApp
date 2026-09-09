@@ -2,26 +2,21 @@
 Picks the correct media session when multiple are active at once (e.g. a
 paused YouTube tab sitting alongside Spotify).
 
-Two-phase selection:
-  1. Cheap metadata scoring (no network calls) ranks every session by how
-     "music-like" it looks - known music app, real artist/album/thumbnail,
-     actively advancing position, browser/video-title penalties, etc.
-  2. Starting from the top-ranked session, a real lyrics search is run for
-     each candidate in turn. The first one that actually has lyrics wins -
-     metadata alone can't fully distinguish e.g. two browser tabs, but
-     having real lyrics is strong confirmation we picked the right source.
-     If nobody has lyrics, the top-scored candidate is used anyway.
+Selection uses cheap metadata scoring (no network calls) to rank every
+session by how "music-like" it looks - known music app, real
+artist/album/thumbnail, actively advancing position, browser/video-title
+penalties, etc. The highest-scored session is returned immediately; lyric
+fetching is handled separately by the GUI so the current title and loading
+message can be shown without waiting for a lyrics provider.
 
-Re-scoring (and the lyrics search) only happens when the set of active
-sessions changes, or when the currently selected session's song changes -
-never on every poll, since it involves a real network lookup.
+Re-scoring only happens when the set of active sessions changes, or when the
+currently selected session's song changes - never on every poll.
 """
 
 from winsdk.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionManager as MediaManager,
 )
 
-from lyrics_fetcher import lyrics_fetcher
 import asyncio
 
 # How much a position must move between two quick samples to count as "playing"
@@ -176,37 +171,10 @@ async def _rank_sessions(sessions):
     return ranked
 
 
-def _find_session_with_lyrics(ranked_sessions):
-    """
-    Walk the ranked sessions best-first, actually searching for lyrics for
-    each in turn. The first one with lyrics wins. Falls back to the
-    top-scored candidate (with lyrics=None) if nobody has any.
-
-    NOTE: does blocking network I/O (lyrics_fetcher) - call from a
-    background thread, not the UI's main thread.
-    """
-    for score, title, artist, app_id, session in ranked_sessions:
-        if title == "Undetected Song" or artist == "Unknown Artist":
-            continue  # nothing meaningful to search for
-        print(f"[Selector] Trying lyrics search for top candidate '{title}' by '{artist}' (score {score})")
-        lyrics = lyrics_fetcher(title, artist)
-        if lyrics:
-            print(f"[Selector] Lyrics found for '{title}' - selecting this session")
-            return session, title, artist, lyrics
-        print(f"[Selector] No lyrics for '{title}' by '{artist}', trying next candidate")
-
-    if ranked_sessions:
-        score, title, artist, app_id, session = ranked_sessions[0]
-        print(f"[Selector] No candidate had lyrics; defaulting to top-scored '{title}'")
-        return session, title, artist, None
-
-    return None, "Undetected Song", "Unknown Artist", None
-
-
 class MediaSelector:
     """
-    Tracks the currently selected session across polls so scoring (and the
-    lyrics search it triggers) only runs when actually needed:
+    Tracks the currently selected session across polls so scoring only runs
+    when actually needed:
       - the set of active sessions changes (a session appeared/disappeared)
       - the currently selected session's song changes
     Otherwise the previous selection is reused as-is - cheap and instant.
@@ -258,7 +226,9 @@ class MediaSelector:
             print(f"[Selector] {len(sessions)} media sessions detected - scoring to pick the right one")
 
         ranked = await _rank_sessions(sessions)
-        session, title, artist, lyrics = _find_session_with_lyrics(ranked)
+        score, title, artist, app_id, session = ranked[0]
+        lyrics = None
+        print(f"[Selector] Using highest-scored session '{title}' by '{artist}' (score {score})")
 
         self._selected_app_id = (session.source_app_user_model_id or "") if session else None
         self._last_title = title
@@ -297,12 +267,12 @@ async def select_best_media():
     """
     Convenience wrapper around a shared MediaSelector instance.
 
-    Returns (session, title, artist, lyrics). Re-scoring and the lyrics
-    search only happen on multi-session detection or a song change on the
-    selected session - see MediaSelector.
+    Returns (session, title, artist, lyrics). Re-scoring only happens on
+    multi-session detection or a song change on the selected session - see
+    MediaSelector. Lyrics are fetched separately by the GUI.
 
-    NOTE: this can do blocking network I/O (a real lyrics search) when
-    rescoring triggers, so call it from a background thread rather than
-    directly on the UI's main thread/event loop.
+    NOTE: position sampling and metadata reads happen in the caller's
+    background thread rather than directly on the UI's main thread/event
+    loop.
     """
     return await _selector.select()
