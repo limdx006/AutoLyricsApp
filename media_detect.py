@@ -1,0 +1,169 @@
+import asyncio
+from winsdk.windows.media.control import (
+    GlobalSystemMediaTransportControlsSessionManager as MediaManager,
+    GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
+)
+
+async def _get_target_session():
+    """Helper to get the current or first available media session."""
+    sessions = await MediaManager.request_async()
+    all_sessions = sessions.get_sessions()
+    if not all_sessions:
+        return None
+    current_session = sessions.get_current_session()
+    return current_session if current_session else all_sessions[0]
+
+async def get_media_position():
+    """Return the current playback position and total duration in seconds."""
+    target = await _get_target_session()
+    if not target:
+        return 0.0, 0.0
+    timeline = target.get_timeline_properties()
+    position = timeline.position.total_seconds()
+    total = timeline.end_time.total_seconds()
+    return position, total
+
+async def get_playback_status():
+    """Return the current playback status as a string: 'playing', 'paused', or 'stopped'."""
+    target = await _get_target_session()
+    if not target:
+        return "stopped"
+    try:
+        status = target.get_playback_info().playback_status
+        if status == PlaybackStatus.PLAYING:
+            return "playing"
+        elif status == PlaybackStatus.PAUSED:
+            return "paused"
+        else:
+            return "stopped"
+    except Exception:
+        return "stopped"
+
+async def get_media_info():
+    """Return current song title and artist."""
+    target = await _get_target_session()
+    if not target:
+        return "Undetected Song", "Unknown Artist"
+    try:
+        info = await target.try_get_media_properties_async()
+        title = info.title if info.title else "Undetected Song"
+        artist = info.artist if info.artist else "Unknown Artist"
+        return title, artist
+    except Exception:
+        return "Undetected Song", "Unknown Artist"
+
+async def control_play():
+    """Resume playback."""
+    target = await _get_target_session()
+    if target:
+        await target.try_play_async()
+
+async def control_pause():
+    """Pause playback."""
+    target = await _get_target_session()
+    if target:
+        await target.try_pause_async()
+
+async def control_next():
+    """Skip to next track."""
+    target = await _get_target_session()
+    if target:
+        await target.try_skip_next_async()
+
+async def control_previous():
+    """Skip to previous track."""
+    target = await _get_target_session()
+    if target:
+        await target.try_skip_previous_async()
+
+
+"""
+Session-explicit variants below - operate on a specific session object
+(e.g. one chosen by media_selector.select_best_media()) instead of
+whichever session Windows itself considers "current". Used by the
+polling loop and playback controls once a session has been selected, so
+they always act on the actual displayed song rather than an arbitrary one.
+"""
+
+async def get_position_for_session(session):
+    """Like get_media_position, but for an explicit session."""
+    if not session:
+        return 0.0, 0.0
+    try:
+        timeline = session.get_timeline_properties()
+        return timeline.position.total_seconds(), timeline.end_time.total_seconds()
+    except Exception:
+        return 0.0, 0.0
+
+async def get_status_for_session(session):
+    """Like get_playback_status, but for an explicit session."""
+    if not session:
+        return "stopped"
+    try:
+        status = session.get_playback_info().playback_status
+        if status == PlaybackStatus.PLAYING:
+            return "playing"
+        elif status == PlaybackStatus.PAUSED:
+            return "paused"
+        else:
+            return "stopped"
+    except Exception:
+        return "stopped"
+
+async def control_play_session(session):
+    """Resume playback on an explicit session."""
+    if session:
+        await session.try_play_async()
+
+async def control_pause_session(session):
+    """Pause playback on an explicit session."""
+    if session:
+        await session.try_pause_async()
+
+async def control_next_session(session):
+    """Skip to next track on an explicit session."""
+    if session:
+        await session.try_skip_next_async()
+
+async def control_previous_session(session):
+    """Skip to previous track on an explicit session."""
+    if session:
+        await session.try_skip_previous_async()
+
+async def detect_media():
+    """Detect and list all active media sessions from Windows."""
+    sessions = await MediaManager.request_async()
+    all_sessions = sessions.get_sessions()
+    print(f"Total active sessions found: {len(all_sessions)}\n")
+
+    if not all_sessions:
+        print("No media sessions detected.")
+        return "Undetected Song", "Unknown Artist"
+
+    current_session = sessions.get_current_session()
+    info = None
+
+    # If there is a current session, use its info
+    if current_session:
+        info = await current_session.try_get_media_properties_async()
+    else:
+        info = await all_sessions[0].try_get_media_properties_async()
+
+    title = info.title if info.title else "Undetected Song"
+    artist = info.artist if info.artist else "Unknown Artist"
+
+    # Print all sessions for debugging
+    for i, session in enumerate(all_sessions):
+        session_info = await session.try_get_media_properties_async()
+        timeline = session.get_timeline_properties()
+        is_current = session == current_session
+        print(f"--- Session #{i + 1} {'[CURRENT/ACTIVE]' if is_current else '[BACKGROUND]'} ---")
+        print(f"  Title:    {session_info.title or 'Undetected Song'}")
+        print(f"  Artist:   {session_info.artist or 'Unknown Artist'}")
+        print(f"  Position: {timeline.position.total_seconds():.1f}s / {timeline.end_time.total_seconds():.1f}s")
+        print(f"  Source:   {session.source_app_user_model_id or 'Unknown'} \n")
+
+    return title, artist
+
+if __name__ == "__main__":
+    asyncio.run(detect_media())

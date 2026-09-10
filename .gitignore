@@ -5,3 +5,7 @@ API.py
 LyricsPlayer.spec
 /dist
 /.qwen
+Qwen.md
+todo.md
+/build
+LyricsPlayer 4.0.spec
