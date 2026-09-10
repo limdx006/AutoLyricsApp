@@ -7,3 +7,5 @@ LyricsPlayer.spec
 /.qwen
 Qwen.md
 todo.md
+/build
+LyricsPlayer 4.0.spec
