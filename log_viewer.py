@@ -48,7 +48,9 @@ _active_window = None  # the single open LogViewerWindow, if any
 
 
 class _TeeStream:
-    """A stdout/stderr replacement that writes through to the original stream and also captures each line into the log buffer."""
+    """A stdout/stderr replacement that writes through to the original stream
+    (when one exists) and also captures each line into the log buffer.
+    """
 
     def __init__(self, original_stream):
         self._original = original_stream
@@ -61,8 +63,14 @@ class _TeeStream:
         kept_lines = [line for line in lines if not _is_suppressed(line)]
         filtered_text = "\n".join(kept_lines)
 
-        if filtered_text:
-            self._original.write(filtered_text)
+        if filtered_text and self._original is not None:
+            try:
+                self._original.write(filtered_text)
+            except Exception:
+                # No console attached (--windowed build) or a broken stub
+                # stream - the log buffer/viewer is the only sink that
+                # matters in that case, so just swallow this.
+                pass
 
         for line in kept_lines:
             if line.strip():
@@ -72,11 +80,51 @@ class _TeeStream:
                     callback(line)
 
     def flush(self):
-        self._original.flush()
+        if self._original is not None:
+            try:
+                self._original.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        try:
+            return bool(self._original is not None and self._original.isatty())
+        except Exception:
+            return False
+
+    def fileno(self):
+        # Some libraries (progress bars, warnings machinery, etc.) probe
+        # this. Without a console there genuinely is no fd, so raise the
+        # same error a real headless stream would.
+        if self._original is not None:
+            try:
+                return self._original.fileno()
+            except Exception:
+                pass
+        raise OSError("No console attached (running as a --windowed build)")
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    @property
+    def encoding(self):
+        try:
+            if self._original is not None:
+                return self._original.encoding
+        except Exception:
+            pass
+        return "utf-8"
 
 
 def install_log_capture():
-    """Redirect stdout/stderr through the tee. Call once, as early as possible at startup."""
+    """Redirect stdout/stderr through the tee. Call once, as early as possible at startup.
+
+    Safe to call even when sys.stdout/sys.stderr are None, which is the
+    normal case for a PyInstaller --windowed build with no console window -
+    print() will simply stop reaching any OS-level console but will still
+    be captured into the in-app log buffer/viewer.
+    """
     sys.stdout = _TeeStream(sys.stdout)
     sys.stderr = _TeeStream(sys.stderr)
 
