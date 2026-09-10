@@ -84,6 +84,7 @@ class MediaDetails(tk.Frame):
             justify="center",
         )
         self.artist_name_label.grid(row=1, column=0, sticky="")  # centered
+        middle_frame.bind("<Configure>", self._update_text_wraplength)
 
         # Offset control (second row, middle column)
         self.offset_frame = tk.Frame(self, bg=ACCENT_COLOR)
@@ -130,6 +131,12 @@ class MediaDetails(tk.Frame):
     def _handle_open_settings(self):
         if self._on_open_settings:
             self._on_open_settings()
+
+    def _update_text_wraplength(self, event):
+        """Keep media text wrapping aligned with the available middle-column width."""
+        wraplength = max(1, event.width - 10)
+        self.song_name_label.configure(wraplength=wraplength)
+        self.artist_name_label.configure(wraplength=wraplength)
 
     def _handle_refresh(self):
         """Refresh button: delegate to the app if it can supply the

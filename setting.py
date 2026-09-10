@@ -101,7 +101,7 @@ class _CustomEntryRow(tk.Frame):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._on_commit = on_commit
         self._on_activate = on_activate
-        self._value_range = value_range
+        self._value_ranges = value_range if value_range and isinstance(value_range[0], tuple) else [value_range] * field_count
 
         self._bullet_label = tk.Label(
             self, text=self._UNSELECTED_BULLET, font=(FONT_FAMILY, 10),
@@ -160,10 +160,12 @@ class _CustomEntryRow(tk.Frame):
 
     def _try_commit(self):
         """If every field currently holds a value, clamp each to value_range, reflect the clamp back, select this row, and fire on_commit."""
-        lo, hi = self._value_range
         if any(not var.get().isdigit() for var in self._vars):
             return  # still incomplete - wait for every field to have a value
-        values = [max(lo, min(hi, int(var.get()))) for var in self._vars]
+        values = [
+            max(lo, min(hi, int(var.get())))
+            for var, (lo, hi) in zip(self._vars, self._value_ranges)
+        ]
         for var, n in zip(self._vars, values):
             var.set(str(n))
         self.set_selected(True)
@@ -278,7 +280,7 @@ class SettingsWindow(tk.Toplevel):
         size_list = _PresetList(self, WINDOW_SIZE_PRESETS, size_index if size_index is not None else -1, on_select=on_window_size_change)
         size_list.pack(fill=tk.X, padx=12)
         size_custom = _CustomEntryRow(
-            self, "Custom -", field_count=2, separator=" x ", value_range=(100, 3000),
+            self, "Custom -", field_count=2, separator=" x ", value_range=((300, 3000), (570, 3000)),
             initial_values=current_window_size,
             on_commit=on_window_size_change,
             on_activate=lambda: size_list.deselect_all(),
