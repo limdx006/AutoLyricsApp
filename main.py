@@ -20,6 +20,7 @@ import sys
 
 from lyrics_fetcher import lyrics_fetcher
 from media_detect import detect_media
+from media_selector import select_best_media
 from gui import LyricsApp
 from log_viewer import install_log_capture, apply_app_icon, configure_taskbar_identity
 
@@ -31,13 +32,15 @@ async def main():
     print("Welcome to LyricsPlayer - Auto-synced lyrics display application.")
     print("*****************************************************************")
 
-    title, artist = await detect_media()
+    await detect_media()
+
+    session, title, artist, _lyrics = await select_best_media()
 
     # Display the GUI
     configure_taskbar_identity()
     root = tk.Tk()
     apply_app_icon(root)
-    app = LyricsApp(root, title, artist)
+    app = LyricsApp(root, title, artist, session=session)
     root.mainloop()
 
     print("****************************************************")

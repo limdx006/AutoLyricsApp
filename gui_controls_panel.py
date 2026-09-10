@@ -19,7 +19,7 @@ async def _gather_update():
 class ControlsPanel(tk.Frame):
     """Bottom section of the player: timeline, transport buttons, and status label."""
 
-    def __init__(self, parent, initial_title="", initial_artist="", on_song_change=None, on_time_update=None, **kwargs):
+    def __init__(self, parent, initial_title="", initial_artist="", initial_session=None, on_song_change=None, on_time_update=None, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
 
         # Fixed height = 20% of window height
@@ -37,13 +37,8 @@ class ControlsPanel(tk.Frame):
         self._last_windows_position = -1.0
         self._last_total_duration = 0.0
         self._has_synced = False
-        # The winsdk session object currently selected by media_selector -
-        # playback controls (prev/next/play-pause) act on this, not
-        # whatever Windows itself considers "current".
-        self._current_session = None
-        # Guards against overlapping fetch cycles: a rescore can trigger a
-        # real (slow) lyrics search, and without this the 500ms loop would
-        # keep firing on top of it, causing multiple concurrent rescores.
+        self._current_session = initial_session
+        # Guards against overlapping fetch cycles
         self._fetch_in_progress = False
         # Song info tracking
         self._last_title = initial_title

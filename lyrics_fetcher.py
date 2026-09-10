@@ -47,7 +47,7 @@ def lyrics_fetcher(title, artist, session=None):
             lyrics = syncedlyrics.search(query, synced_only = True)
             cleaned = remove_empty_lines(lyrics)
             print(f"[Lyrics] Retrieved lyrics for '{query}' with {len(cleaned.splitlines())} lines")
-            time.sleep(0.3)  # Give the media player a moment to update its state
+            time.sleep(0.5)  # Give the media player a moment to update its state
             print(f"[Session] Current session: {session}")
             if session is not None:
                 print("[Nudge] Triggering auto nudge after lyrics fetch")

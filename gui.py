@@ -14,7 +14,7 @@ from setting import open_settings_window
 
 
 class LyricsApp:
-    def __init__(self, root, title="Song name here", artist="artist name"):
+    def __init__(self, root, title="Song name here", artist="artist name", session=None):
         self.root = root
         self._lyrics_fetch_generation = 0
         # Per-song lyric cache: original always kept once fetched
@@ -63,6 +63,7 @@ class LyricsApp:
             self.root,
             initial_title=title,
             initial_artist=artist,
+            initial_session=session,
             on_song_change=self._handle_song_change,
             on_time_update=self.lyrics_display.update_time,
         )
