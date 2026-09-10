@@ -234,12 +234,12 @@ class LogViewerWindow(tk.Toplevel):
 
 
 def open_log_viewer(parent):
-    """Open the log viewer, or focus the existing one if it's already open."""
+    """Open the log viewer, or close it (same as clicking its own close
+    button/cross) if it's already open - lets the 📝 button act as a toggle."""
     global _active_window
     if _active_window is not None and _active_window.winfo_exists():
-        _active_window.lift()
-        _active_window.focus_force()
-        return _active_window
+        _active_window._on_close()
+        return None
     _active_window = LogViewerWindow(parent)
     return _active_window
 

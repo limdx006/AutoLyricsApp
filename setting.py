@@ -353,12 +353,12 @@ class SettingsWindow(tk.Toplevel):
 
 def open_settings_window(parent, current_window_size, current_font_sizes, current_default_offset,
                           on_window_size_change, on_font_size_change, on_default_offset_change):
-    """Open the settings window, or focus the existing one if already open."""
+    """Open the settings window, or close it (same as clicking its own close
+    button/cross) if it's already open - lets the ⚙ button act as a toggle."""
     global _active_window
     if _active_window is not None and _active_window.winfo_exists():
-        _active_window.lift()
-        _active_window.focus_force()
-        return _active_window
+        _active_window._on_close()
+        return None
     _active_window = SettingsWindow(
         parent, current_window_size, current_font_sizes, current_default_offset,
         on_window_size_change, on_font_size_change, on_default_offset_change,
