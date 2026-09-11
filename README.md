@@ -1,6 +1,8 @@
 # 🎵 AutoLyricsApp
 <img width="256" height="256" alt="icon" src="https://github.com/user-attachments/assets/71043c39-7800-4239-a4f3-dc04a0ac2f3e" />
 
+Want to play songs on your PC and sing along, but struggle to find properly synced lyrics online? Try this program.
+
 A real-time desktop lyrics player built with Python that detects the currently playing music on Windows and displays **synchronised (LRC) lyrics** with smooth animations and a modern GUI.
 
 ---
