@@ -1,6 +1,6 @@
 import requests
 
-MY_LYRICS_API = "http://127.0.0.1:8000"
+MY_LYRICS_API = "https://limdxlyricsapi.onrender.com/"
 
 
 def fetch_from_my_lyrics_api(title, artist):
