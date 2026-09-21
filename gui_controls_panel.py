@@ -1,15 +1,15 @@
 import tkinter as tk
 import asyncio
-import threading
 from config import *
 from media_detect import get_position_for_session, get_status_for_session, control_play_session, control_pause_session, control_next_session, control_previous_session
 from media_selector import select_best_media
 from time_formatter import format_display_time
 from local_timer import LocalTimer
+from async_worker import run_async
 
 
 async def _gather_update():
-    """Pick the best session (media_selector), then read its position/status - one asyncio.run() per poll instead of three."""
+    """Pick the best session (media_selector), then read its position/status - one scheduled call on the shared event loop per poll instead of three."""
     session, title, artist, _lyrics = await select_best_media()
     position, total = await get_position_for_session(session)
     status = await get_status_for_session(session)
@@ -157,9 +157,9 @@ class ControlsPanel(tk.Frame):
             return
         self._fetch_in_progress = True
 
-        def fetch():
+        def on_result(future):
             try:
-                session, position, total, title, artist, status = asyncio.run(_gather_update())
+                session, position, total, title, artist, status = future.result()
             except Exception as e:
                 print(f"[Session] Media selection failed: {e}")
                 session = None
@@ -170,8 +170,12 @@ class ControlsPanel(tk.Frame):
             def done():
                 self._fetch_in_progress = False
                 self._process_windows_update(session, position, total, title, artist, status)
+            # on_result runs on the worker thread - marshal back to the Tk main thread
             self.after(0, done)
-        threading.Thread(target=fetch, daemon=True).start()
+
+        # Runs on the app's single shared background event loop instead of
+        # spinning up a brand-new thread + event loop for every 500ms poll.
+        run_async(_gather_update(), on_result)
         self.after(500, self._fetch_windows_loop)
 
     def _process_windows_update(self, session, position, total, title, artist, status):
@@ -257,46 +261,60 @@ class ControlsPanel(tk.Frame):
     def _on_previous(self):
         """Handle previous track button click - acts on the currently selected session."""
         session = self._current_session
-        def run():
+
+        def on_result(future):
             try:
-                asyncio.run(control_previous_session(session))
+                future.result()
             except Exception as e:
                 print(f"Previous track failed: {e}")
-        threading.Thread(target=run, daemon=True).start()
+
+        run_async(control_previous_session(session), on_result)
 
     def _on_next(self):
         """Handle next track button click - acts on the currently selected session."""
         session = self._current_session
-        def run():
+
+        def on_result(future):
             try:
-                asyncio.run(control_next_session(session))
+                future.result()
             except Exception as e:
                 print(f"Next track failed: {e}")
-        threading.Thread(target=run, daemon=True).start()
+
+        run_async(control_next_session(session), on_result)
 
     def _on_play_pause(self):
         """Handle play/pause button click - checks current status and toggles, on the currently selected session."""
         session = self._current_session
-        def run():
+
+        async def toggle():
+            status = await get_status_for_session(session)
+            if status == "playing":
+                await control_pause_session(session)
+                return "paused"
+            else:
+                await control_play_session(session)
+                return "playing"
+
+        def on_result(future):
             try:
-                status = asyncio.run(get_status_for_session(session))
-                if status == "playing":
-                    asyncio.run(control_pause_session(session))
-                    new_symbol = "\u25B6"  # play symbol
-                    new_status_text = "Paused"
-                    # Freeze the local timer so the displayed position/lyrics stop too
-                    self.after(0, self._local_timer.stop)
-                else:
-                    asyncio.run(control_play_session(session))
-                    new_symbol = "\u23f8"  # pause symbol
-                    new_status_text = "Playing"
-                    # Resume the local timer from wherever it was frozen
-                    self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))
-                # Update button symbol and status label on main thread - gives
-                # instant feedback instead of waiting for the next 500ms poll
-                # to confirm the change.
-                self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
-                self.after(0, lambda: self.status_label.config(text=new_status_text))
+                new_state = future.result()
             except Exception as e:
                 print(f"Play/pause failed: {e}")
-        threading.Thread(target=run, daemon=True).start()
+                return
+            if new_state == "paused":
+                new_symbol = "\u25B6"  # play symbol
+                new_status_text = "Paused"
+                # Freeze the local timer so the displayed position/lyrics stop too
+                self.after(0, self._local_timer.stop)
+            else:
+                new_symbol = "\u23f8"  # pause symbol
+                new_status_text = "Playing"
+                # Resume the local timer from wherever it was frozen
+                self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))
+            # Update button symbol and status label on main thread - gives
+            # instant feedback instead of waiting for the next 500ms poll
+            # to confirm the change.
+            self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
+            self.after(0, lambda: self.status_label.config(text=new_status_text))
+
+        run_async(toggle(), on_result)
