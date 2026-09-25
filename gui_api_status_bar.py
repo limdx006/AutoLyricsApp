@@ -24,7 +24,10 @@ _STATUS_COLOR = {
     api_status.STATUS_OFFLINE: ERROR_COLOR,  # red
 }
 
-_DOT_SIZE = 4
+# Visual diameter of the dot.
+_DOT_SIZE = 5
+_DOT_MARGIN = 2
+_CANVAS_SIZE = _DOT_SIZE + _DOT_MARGIN * 2
 
 
 class ApiStatusBar(tk.Frame):
@@ -43,20 +46,13 @@ class ApiStatusBar(tk.Frame):
         inner.pack(expand=True)
 
         self.dot_canvas = tk.Canvas(
-            inner,
-            width=_DOT_SIZE,
-            height=_DOT_SIZE,
-            bg=BG_COLOR,
-            highlightthickness=0,
+            inner, width=_CANVAS_SIZE, height=_CANVAS_SIZE,
+            bg=BG_COLOR, highlightthickness=0, borderwidth=0,
         )
         self.dot_canvas.pack(side=tk.LEFT, padx=(0, 5))
         self._dot_id = self.dot_canvas.create_oval(
-            0,
-            0,
-            _DOT_SIZE,
-            _DOT_SIZE,
-            fill=_STATUS_COLOR[api_status.STATUS_STARTING],
-            outline="",
+            _DOT_MARGIN, _DOT_MARGIN, _DOT_MARGIN + _DOT_SIZE, _DOT_MARGIN + _DOT_SIZE,
+            fill=_STATUS_COLOR[api_status.STATUS_STARTING], outline="",
         )
 
         self.text_label = tk.Label(

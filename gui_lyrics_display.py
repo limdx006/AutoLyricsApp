@@ -36,6 +36,9 @@ class LyricsDisplay(tk.Frame):
     (higher = snappier, lower = smoother/slower).
     """    
     SCROLL_EASE = 0.25
+    INTRO_ICON = "\U0001f3b5"  # 🎵
+    # Gaps shorter than this aren't worth flagging with a placeholder line
+    INTRO_ICON_MIN_GAP = 3.0  # seconds
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
@@ -103,6 +106,8 @@ class LyricsDisplay(tk.Frame):
             self._show_placeholder("Lyrics not found, \nmaybe try another song.")
             return
 
+        self._prepend_intro_icon_if_needed()
+
         self._render_lines()
         self._set_current_index(0, animate=False)
 
@@ -156,6 +161,17 @@ class LyricsDisplay(tk.Frame):
             self._set_current_index(max(self._current_index, 0), animate=False)
 
     """Internal helpers"""
+
+    def _prepend_intro_icon_if_needed(self):
+        """
+        Some songs have a long instrumental intro before the first lyric line - 
+        without this, that first line would be highlighted immediately. 
+
+        When the gap before it is long enough to notice, insert a music-note placeholder at t=0
+        """
+        first_time, _ = self._lines[0]
+        if first_time > self.INTRO_ICON_MIN_GAP:
+            self._lines.insert(0, (0.0, self.INTRO_ICON))
 
     def _show_placeholder(self, message):
         """Clear any rendered lyrics and show a centered status message instead (used for both the loading state and the empty/no-lyrics state)."""
