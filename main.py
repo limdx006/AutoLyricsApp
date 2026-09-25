@@ -23,8 +23,10 @@ from media_detect import detect_media
 from media_selector import select_best_media
 from gui import LyricsApp
 from log_viewer import install_log_capture, apply_app_icon, configure_taskbar_identity
+import api_status
 
 install_log_capture()  # tee stdout/stderr into the log buffer as early as possible
+api_status.start()  # begin polling LimdxAPI health in the background immediately
 
 
 async def main():

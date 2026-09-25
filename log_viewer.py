@@ -20,8 +20,15 @@ from collections import deque
 from config import *
 
 MAX_LOG_LINES = 50
-ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
 APP_USER_MODEL_ID = "AutoLyricsApp.AutoLyricsPlayer"
+
+
+def _resource_dir():
+    """Directory to look for bundled resources (icon.ico) in."""
+    return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+
+
+ICON_PATH = os.path.join(_resource_dir(), "icon.ico")
 
 # Known noisy library-internal messages to drop entirely (console + log
 # buffer) - these come from syncedlyrics printing individual provider
@@ -130,9 +137,16 @@ def install_log_capture():
 
 
 def configure_taskbar_identity():
-    """Give Windows a stable identity so the taskbar uses this app's icon."""
-    if os.name == "nt":
+    """Give Windows a stable identity so the taskbar uses this app's icon
+    (and groups/pins it separately from a generic Python process) instead
+    of falling back to python.exe's own identity. Must be called before
+    any window (even a hidden/withdrawn one) is created."""
+    if os.name != "nt":
+        return
+    try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception as e:
+        print(f"[Icon] Failed to set AppUserModelID: {e}")
 
 
 def get_log_lines():
@@ -141,12 +155,18 @@ def get_log_lines():
         return list(_log_buffer)
 
 
-def apply_app_icon(window):
-    """Apply the shared app icon; silently keeps the default if icon.ico isn't present yet."""
+def apply_app_icon(window, _retry=True):
+    """Apply the shared app icon to `window`."""
+    if not os.path.isfile(ICON_PATH):
+        print(f"[Icon] icon.ico not found at '{ICON_PATH}' - keeping default Tk icon")
+        return
     try:
         window.iconbitmap(ICON_PATH)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Icon] Failed to set window icon: {e}")
+        return
+    if _retry:
+        window.after(150, lambda: apply_app_icon(window, _retry=False))
 
 
 class LogViewerWindow(tk.Toplevel):

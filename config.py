@@ -6,6 +6,8 @@ WINDOW_HEIGHT = 800
 BG_COLOR = "#1a1a2e"  # Dark blue-ish background
 ACCENT_COLOR = "#16213e"  # Slightly lighter for info panel
 ERROR_COLOR = "#e94560"  # Reddish accent for errors/highlights
+GOOD_COLOR = "#2ecc71" 
+LOADING_COLOR = "#e6a23c"
 
 FONT_FAMILY = "Helvetica"
 

@@ -25,6 +25,10 @@ def fetch_from_my_lyrics_api(title, artist):
         search_time = time.perf_counter() - search_start 
         print( f"[MyLyricsAPI] Song search took " f"{search_time:.3f} seconds" )
 
+        # Getting a response at all (even a 404) proves the API is up
+        import api_status
+        api_status.report_online()
+
         if response.status_code == 404:
             print(f"[MyLyricsAPI] Song not found: '{title}' by '{artist}'")
             return None

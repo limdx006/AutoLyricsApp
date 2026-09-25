@@ -17,7 +17,7 @@ async def _gather_update():
 
 
 class ControlsPanel(tk.Frame):
-    """Bottom section of the player: timeline, transport buttons, and status label."""
+    """Bottom section of the player: timeline and transport buttons."""
 
     def __init__(self, parent, initial_title="", initial_artist="", initial_session=None, on_song_change=None, on_time_update=None, **kwargs):
         super().__init__(parent, bg=BG_COLOR, **kwargs)
@@ -26,10 +26,9 @@ class ControlsPanel(tk.Frame):
         self.configure(height=int(WINDOW_HEIGHT * 0.2))
         self.pack_propagate(False)  # prevent shrinking to fit contents
 
-        # 3 rows: timeline, buttons, status
+        # 2 rows: timeline, buttons
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=2)
-        self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         # Hybrid timer state
@@ -52,7 +51,6 @@ class ControlsPanel(tk.Frame):
 
         self._build_timeline()
         self._build_buttons()
-        self._build_status()
         # Start the two update loops
         self.after(0, self._fetch_windows_loop)   # slow: fetch from Windows every 500ms
         self.after(0, self._update_ui_loop)       # fast: update UI from local timer every 100ms
@@ -124,12 +122,6 @@ class ControlsPanel(tk.Frame):
         btn.bind("<Enter>", lambda e: e.widget.configure(bg="#24243e"))
         btn.bind("<Leave>", lambda e: e.widget.configure(bg=BG_COLOR))
         return btn
-
-    def _build_status(self):
-        self.status_label = tk.Label(
-            self, text="status", bg=BG_COLOR, fg=COLOR_STATUS_FG, font=(FONT_FAMILY, 10)
-        )
-        self.status_label.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
 
     """Behavior"""
 
@@ -208,15 +200,13 @@ class ControlsPanel(tk.Frame):
                 if self._on_song_change:
                     self._on_song_change(title, artist)
 
-        # Sync play/pause button symbol, status label, and timer state with external playback status
+        # Sync play/pause button symbol with external playback status
         if status == "playing":
             self.play_pause_button.config(text="\u23f8")  # pause symbol
-            self.status_label.config(text="Playing")
             if not self._local_timer.is_running() and self._has_synced:
                 self._local_timer.start(position)
         elif status in ("paused", "stopped"):
             self.play_pause_button.config(text="\u25B6")  # play symbol
-            self.status_label.config(text="Paused")
             if self._local_timer.is_running():
                 self._local_timer.stop()
 
@@ -303,18 +293,14 @@ class ControlsPanel(tk.Frame):
                 return
             if new_state == "paused":
                 new_symbol = "\u25B6"  # play symbol
-                new_status_text = "Paused"
                 # Freeze the local timer so the displayed position/lyrics stop too
                 self.after(0, self._local_timer.stop)
             else:
                 new_symbol = "\u23f8"  # pause symbol
-                new_status_text = "Playing"
                 # Resume the local timer from wherever it was frozen
                 self.after(0, lambda: self._local_timer.start(self._local_timer.get_position()))
-            # Update button symbol and status label on main thread - gives
-            # instant feedback instead of waiting for the next 500ms poll
-            # to confirm the change.
+            # Update button symbol on main thread - gives instant feedback
+            # instead of waiting for the next 500ms poll to confirm the change.
             self.after(0, lambda: self.play_pause_button.config(text=new_symbol))
-            self.after(0, lambda: self.status_label.config(text=new_status_text))
 
         run_async(toggle(), on_result)

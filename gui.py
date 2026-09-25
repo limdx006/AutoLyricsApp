@@ -6,6 +6,7 @@ from gui_controls_panel import ControlsPanel
 from gui_media_details import MediaDetails
 from gui_language_bar import LanguageBar
 from gui_lyrics_display import LyricsDisplay
+from gui_api_status_bar import ApiStatusBar
 from lyrics_fetcher import lyrics_fetcher
 from language_detect import detect_lyrics_language
 from lyrics_translator import translate_lyrics
@@ -57,6 +58,10 @@ class LyricsApp:
         # Sync the lyrics display with whatever offset is already showing
         # (e.g. DEFAULT_OFFSET from config.py) now that both widgets exist.
         self.lyrics_display.set_offset(self.media_details.get_offset())
+
+        # API status strip - packed BOTTOM *before* the controls panel belowost).
+        self.api_status_bar = ApiStatusBar(self.root)
+        self.api_status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Controls (bottom 25%)
         self.controls = ControlsPanel(
