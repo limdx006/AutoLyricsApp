@@ -1,6 +1,8 @@
 # Window dimensions
 WINDOW_WIDTH = 400
 WINDOW_HEIGHT = 800
+# WINDOW_WIDTH = 1000
+# WINDOW_HEIGHT = 1000
 
 # Colours
 BG_COLOR = "#1a1a2e"  # Dark blue-ish background
@@ -40,4 +42,5 @@ FONT_SIZE_PRESETS = [
     ("Default — 16 / 13 / 12", {"active": 16, "nearby": 13, "far": 12}),
     ("Large  — 18 / 14 / 13", {"active": 18, "nearby": 14, "far": 13}),
     ("XLarge — 20 / 16 / 14", {"active": 20, "nearby": 16, "far": 14}),
+    # ("JY — 25 / 25 / 25", {"active": 25, "nearby": 25, "far": 25}),
 ]
