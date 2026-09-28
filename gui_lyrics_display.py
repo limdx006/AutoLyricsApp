@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import font as tkfont
 from config import *
 from time_formatter import parse_lrc_lyrics
-
+from word_wraper import _split_long_unit, _split_wrap_units
 
 class LyricsDisplay(tk.Frame):
     """
@@ -34,7 +34,7 @@ class LyricsDisplay(tk.Frame):
     """
     Scroll easing factor: fraction of the remaining distance covered on each animation tick 
     (higher = snappier, lower = smoother/slower).
-    """    
+    """
     SCROLL_EASE = 0.25
     INTRO_ICON = "\U0001f3b5"  # 🎵
     # Gaps shorter than this aren't worth flagging with a placeholder line
@@ -150,7 +150,11 @@ class LyricsDisplay(tk.Frame):
         wrapping consistent with the new sizes rather than reusing stale
         wrap widths from before the change.
         """
-        if (active, nearby, far) == (self._font_size_active, self._font_size_nearby, self._font_size_far):
+        if (active, nearby, far) == (
+            self._font_size_active,
+            self._font_size_nearby,
+            self._font_size_far,
+        ):
             return
         self._font_size_active = active
         self._font_size_nearby = nearby
@@ -208,24 +212,40 @@ class LyricsDisplay(tk.Frame):
         self.canvas.yview_moveto(0.0)
 
     def _wrap_text(self, text, max_width):
-        """Greedily word-wrap text to max_width pixels, measured with self._wrap_font."""
+        """
+        Greedily wrap text to max_width pixels, measured with self._wrap_font.
+
+        Breaks happen between space-separated words like before, but also
+        between individual Chinese/Japanese characters (which have no
+        spaces), and any single unit still wider than a whole row gets
+        split by character as a last resort so nothing can overflow.
+        """
         if max_width <= 0:
             return text
-        words = text.split()
-        if not words:
+        units = _split_wrap_units(text)
+        if not units:
             return text
 
-        wrapped_rows = []
-        current_row = words[0]
-        for word in words[1:]:
-            candidate = f"{current_row} {word}"
-            if self._wrap_font.measure(candidate) <= max_width:
-                current_row = candidate
+        measure = self._wrap_font.measure
+        rows = []
+        current = ""
+        for unit, space_before in units:
+            if current:
+                candidate = current + (" " if space_before else "") + unit
+                if measure(candidate) <= max_width:
+                    current = candidate
+                    continue
+                rows.append(current)
+                current = ""
+            # Starting a fresh row with this unit
+            if measure(unit) <= max_width:
+                current = unit
             else:
-                wrapped_rows.append(current_row)
-                current_row = word
-        wrapped_rows.append(current_row)
-        return "\n".join(wrapped_rows)
+                chunks = _split_long_unit(unit, max_width, measure)
+                rows.extend(chunks[:-1])
+                current = chunks[-1]
+        rows.append(current)
+        return "\n".join(rows)
 
     def _render_lines(self):
         """(Re)build all lyric canvas items, pre-wrapped and laid out with no overlap."""
