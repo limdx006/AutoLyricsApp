@@ -88,7 +88,7 @@ class MediaDetails(tk.Frame):
 
         # Offset control (second row, middle column)
         self.offset_frame = tk.Frame(self, bg=ACCENT_COLOR)
-        self.offset_frame.grid(row=1, column=1, padx=5, pady=5)
+        self.offset_frame.grid(row=1, column=1, padx=5)
         # Center the frame contents
         self.offset_label = tk.Label(
             self.offset_frame,
