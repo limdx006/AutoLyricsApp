@@ -13,6 +13,7 @@ import time
 import syncedlyrics
 import re 
 from request_api import fetch_from_my_lyrics_api
+from api_status import get_status
 
 from auto_nudge import trigger_auto_nudge
 
@@ -46,21 +47,24 @@ def lyrics_fetcher(title, artist, session=None):
         return None
     query = f"{title} {artist}".strip()
 
-    # Try MyLyricsAPI first
-    print(f"[MyLyricsAPI] Searching for '{title}' by '{artist}'")
-    lyrics = fetch_from_my_lyrics_api(title, artist)
-    if lyrics:
-        cleaned = remove_empty_lines(lyrics)
-        print(
-            f"[MyLyricsAPI] Retrieved lyrics for '{query}' "
-            f"with {len(cleaned.splitlines())} lines"
-        )
-        time.sleep(0.5)
-        print(f"[Session] Current session: {session}")
-        if session is not None:
-            print("[Nudge] Triggering auto nudge after lyrics fetch")
-            trigger_auto_nudge(0.2, session=session)
-        return cleaned
+    api_status = get_status()
+    print(f"[API_status]: {api_status}")
+    if api_status == "online":
+        # Try MyLyricsAPI first if the API status is online
+        print(f"[MyLyricsAPI] Service online start searching for '{title}' by '{artist}'")
+        lyrics = fetch_from_my_lyrics_api(title, artist)
+        if lyrics:
+            cleaned = remove_empty_lines(lyrics)
+            print(
+                f"[MyLyricsAPI] Retrieved lyrics for '{query}' "
+                f"with {len(cleaned.splitlines())} lines"
+            )
+            time.sleep(0.5)
+            print(f"[Session] Current session: {session}")
+            if session is not None:
+                print("[Nudge] Triggering auto nudge after lyrics fetch")
+                trigger_auto_nudge(0.2, session=session)
+            return cleaned
 
     print(f"[Lyrics] Falling back to syncedlyrics for '{query}'")
     # MyLyricsAPI failed/not found then use syncedlyrics

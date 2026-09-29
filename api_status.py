@@ -68,12 +68,12 @@ def _set_status(new_status):
         if new_status == _status:
             return
         _status = new_status
-    print(f"[APIStatus] LimdxAPI status -> {new_status}")
+    print(f"[API_Status] LimdxAPI status -> {new_status}")
     for callback in list(_subscribers):
         try:
             callback(new_status)
         except Exception as e:
-            print(f"[APIStatus] Subscriber callback failed: {e}")
+            print(f"[API_Status] Subscriber callback failed: {e}")
 
 
 def _ping(timeout):
