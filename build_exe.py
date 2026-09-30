@@ -4,7 +4,7 @@ PyInstaller.__main__.run([
     'main.py',                          # Entry point
     '--onefile',                        # Single .exe file
     '--windowed',                       # No console window (GUI app)
-    '--name', 'LyricsPlayer 4.0',           # Output filename
+    '--name', 'LyricsPlayer',           # Output filename
 
     # Icon: bundle as data AND embed in exe
     '--add-data', 'icon.ico;.',         # Runtime access
