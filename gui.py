@@ -12,6 +12,40 @@ from language_detect import detect_lyrics_language
 from lyrics_translator import translate_lyrics
 from auto_nudge import trigger_auto_nudge
 from setting import open_settings_window
+import user_prefs
+
+
+def _validate_window_size(value):
+    """A saved window size is trusted only if it's a plausible (width,
+    height) pair - guards against a corrupted/hand-edited settings file
+    (or one from an older version with a different valid range)."""
+    try:
+        width, height = int(value[0]), int(value[1])
+        if 100 <= width <= 4000 and 100 <= height <= 4000:
+            return (width, height)
+    except (TypeError, ValueError, IndexError, KeyError):
+        pass
+    return None
+
+
+def _validate_font_sizes(value):
+    try:
+        sizes = {key: int(value[key]) for key in ("active", "nearby", "far")}
+        if all(6 <= size <= 72 for size in sizes.values()):
+            return sizes
+    except (TypeError, ValueError, KeyError):
+        pass
+    return None
+
+
+def _validate_offset(value):
+    try:
+        offset = float(value)
+        if OFFSET_MIN <= offset <= OFFSET_MAX:
+            return offset
+    except (TypeError, ValueError):
+        pass
+    return None
 
 
 class LyricsApp:
@@ -22,15 +56,19 @@ class LyricsApp:
         self._current_raw_lyrics = None
         self._translated_lyrics_cache = None
         # Tracked so the settings window knows which presets are currently selected and can highlight them accordingly
-        self._current_window_size = (WINDOW_WIDTH, WINDOW_HEIGHT)
-        self._current_font_sizes = {
+        # Restored from the saved preferences file when available
+        saved_prefs = user_prefs.load()
+        self._current_window_size = (
+            _validate_window_size(saved_prefs.get("window_size")) or (WINDOW_WIDTH, WINDOW_HEIGHT)
+        )
+        self._current_font_sizes = _validate_font_sizes(saved_prefs.get("font_sizes")) or {
             "active": LyricsDisplay.FONT_SIZE_ACTIVE_DEFAULT,
             "nearby": LyricsDisplay.FONT_SIZE_NEARBY_DEFAULT,
             "far": LyricsDisplay.FONT_SIZE_FAR_DEFAULT,
         }
-        self._current_default_offset = DEFAULT_OFFSET
+        self._current_default_offset = _validate_offset(saved_prefs.get("default_offset")) or DEFAULT_OFFSET
         self.root.title("Lyrics Player")
-        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+        self.root.geometry(f"{self._current_window_size[0]}x{self._current_window_size[1]}")
         self.root.resizable(False, False)
         self.root.configure(bg=BG_COLOR)
 
@@ -55,11 +93,19 @@ class LyricsApp:
         self.lyrics_display.pack(
             side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(5, 10)
         )
-        # Sync the lyrics display with whatever offset is already showing
-        # (e.g. DEFAULT_OFFSET from config.py) now that both widgets exist.
+        # Apply the saved default offset now that lyrics_display exists
+        self.media_details.set_default_offset(self._current_default_offset)
+        self.media_details.reset_offset()
         self.lyrics_display.set_offset(self.media_details.get_offset())
+        # Apply the saved font sizes
+        self.lyrics_display.set_font_sizes(
+            self._current_font_sizes["active"],
+            self._current_font_sizes["nearby"],
+            self._current_font_sizes["far"],
+        )
 
-        # API status strip - packed BOTTOM *before* the controls panel belowost).
+        # API status strip - packed BOTTOM *before* the controls panel below,
+        # so it lands at the true bottom edge and controls sits just above it
         self.api_status_bar = ApiStatusBar(self.root)
         self.api_status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -161,11 +207,13 @@ class LyricsApp:
         self._current_window_size = size
         width, height = size
         self.root.geometry(f"{width}x{height}")
+        user_prefs.save({"window_size": list(size)})
 
     def _apply_font_sizes(self, sizes):
         """Called when a font-size preset is selected in the settings window."""
         self._current_font_sizes = sizes
         self.lyrics_display.set_font_sizes(sizes["active"], sizes["nearby"], sizes["far"])
+        user_prefs.save({"font_sizes": sizes})
 
     def _apply_default_offset(self, value):
         """Called when the settings window's default-offset field is committed.
@@ -174,3 +222,4 @@ class LyricsApp:
         """
         self._current_default_offset = value
         self.media_details.set_default_offset(value)
+        user_prefs.save({"default_offset": value})
