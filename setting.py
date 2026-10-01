@@ -9,12 +9,15 @@ always-on-top state kept in sync with the main window's pin button.
 """
 
 import re
+import threading
 import webbrowser
 import tkinter as tk
+from tkinter import messagebox
 from config import *
 from log_viewer import apply_app_icon
 import update_checker
-from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
+import updater
+from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO, RELEASE_ASSET_NAME
 
 _active_window = None  # the single open SettingsWindow, if any
 
@@ -265,9 +268,12 @@ class _UpdateSection(tk.Frame):
     in-app download/install isn't built yet).
     """
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, on_restart=None, **kwargs):
         super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
         self._latest_result = None
+        # Called once the swap script is launched, to close the whole app
+        # (not just this window) so the exe's file lock releases.
+        self._on_restart = on_restart
 
         tk.Label(
             self, text=f"Version {APP_VERSION}", font=(FONT_FAMILY, 10),
@@ -325,14 +331,95 @@ class _UpdateSection(tk.Frame):
 
     def _handle_click(self):
         if self._latest_result and self._latest_result.get("available"):
-            url = self._latest_result.get("download_url") or (
-                f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
-            )
-            webbrowser.open(url)
+            self._handle_update_click()
             return
         self._button.configure(text="Checking...", state="disabled")
         self._status_label.configure(text="")
         update_checker.check_now(force=True)
+
+    def _handle_update_click(self):
+        """The button reads 'Update to vX.Y.Z' - actually install it, or
+        fall back to just opening the release page when there's nothing
+        here to replace (running from source) or nowhere safe to put it."""
+        result = self._latest_result
+        release_page = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+        download_url = result.get("download_url")
+
+        if not updater.is_frozen():
+            webbrowser.open(download_url or release_page)
+            return
+
+        if not download_url:
+            messagebox.showerror(
+                "Update",
+                f"Couldn't find {RELEASE_ASSET_NAME} in the v{result['latest_version']} "
+                f"release - opening the release page instead.",
+            )
+            webbrowser.open(release_page)
+            return
+
+        if not updater.can_write_target():
+            messagebox.showerror(
+                "Update",
+                "LyricsPlayer doesn't have permission to update itself here - "
+                "try moving it out of Program Files, or run it as administrator.",
+            )
+            return
+
+        if not messagebox.askyesno(
+            "Update LyricsPlayer",
+            f"Update to v{result['latest_version']}?\n\nThe app will close and reopen automatically.",
+        ):
+            return
+
+        self._start_download(download_url)
+
+    def _start_download(self, url):
+        self._button.configure(state="disabled")
+        self._status_label.configure(text="Downloading... 0%", fg=COLOR_STATUS_FG)
+        last_percent = {"value": -1}
+
+        def on_progress(downloaded, total):
+            if total:
+                percent = int(downloaded * 100 / total)
+                if percent == last_percent["value"]:
+                    return  # skip redundant UI updates between whole percentage points
+                last_percent["value"] = percent
+                text = f"Downloading... {percent}%"
+            else:
+                text = f"Downloading... {downloaded // 1024} KB"
+            self.after(0, lambda: self._status_label.configure(text=text))
+
+        def worker():
+            try:
+                path = updater.download_update(url, progress_callback=on_progress)
+            except Exception as e:
+                print(f"[Update] Download failed: {e}")
+                self.after(0, lambda: self._download_failed())
+                return
+            self.after(0, lambda: self._download_complete(path))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _download_failed(self):
+        if not self.winfo_exists():
+            return
+        self._button.configure(text=f"Update to v{self._latest_result['latest_version']}", state="normal")
+        self._status_label.configure(text="Download failed - try again", fg=ERROR_COLOR)
+
+    def _download_complete(self, downloaded_path):
+        if not self.winfo_exists():
+            return
+        self._status_label.configure(text="Installing update...", fg=COLOR_STATUS_FG)
+        try:
+            updater.apply_update(downloaded_path)
+        except Exception as e:
+            print(f"[Update] Failed to launch updater: {e}")
+            self._status_label.configure(text="Update failed to start", fg=ERROR_COLOR)
+            self._button.configure(text=f"Update to v{self._latest_result['latest_version']}", state="normal")
+            return
+        if self._on_restart:
+            self.after(500, self._on_restart)  # brief pause so "Installing..." is visible
 
     def _on_destroy(self, _event=None):
         update_checker.unsubscribe(self._on_result)
@@ -418,7 +505,7 @@ class SettingsWindow(tk.Toplevel):
             bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
         ).pack(anchor="w", padx=12, pady=(16, 4))
 
-        update_section = _UpdateSection(self)
+        update_section = _UpdateSection(self, on_restart=self._handle_update_restart)
         update_section.pack(fill=tk.X, padx=12, pady=(0, 12))
         self._update_section = update_section
 
@@ -449,6 +536,12 @@ class SettingsWindow(tk.Toplevel):
         global _active_window
         _active_window = None
         self.destroy()
+
+    def _handle_update_restart(self):
+        """Called once the update's swap script has been launched - close
+        the whole app (self.master is root, not just this window) so the
+        exe's file lock releases and the new version can start."""
+        self.master.destroy()
 
 
 def open_settings_window(parent, current_window_size, current_font_sizes, current_default_offset,
