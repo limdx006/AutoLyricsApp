@@ -28,18 +28,17 @@ set "NEW={new_exe}"
 set "TARGET={target_exe}"
 set "RETRIES=10"
 
-:retry
+:retry_move
 move /y "%NEW%" "%TARGET%" >nul 2>&1
 if exist "%NEW%" (
     set /a RETRIES-=1
     if %RETRIES% gtr 0 (
         ping 127.0.0.1 -n 2 >nul
-        goto retry
+        goto retry_move
     )
     exit /b 1
 )
 
-start "" "%TARGET%"
 del "%~f0"
 """
 
@@ -118,11 +117,10 @@ def apply_update(new_exe_path):
     with open(script_path, "w") as f:
         f.write(script)
 
-    DETACHED_PROCESS = 0x00000008
-    CREATE_NEW_PROCESS_GROUP = 0x00000200
+    CREATE_NO_WINDOW = 0x08000000
     subprocess.Popen(
         ["cmd.exe", "/c", script_path],
-        creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+        creationflags=CREATE_NO_WINDOW,
     )
 
 

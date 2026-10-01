@@ -368,7 +368,9 @@ class _UpdateSection(tk.Frame):
 
         if not messagebox.askyesno(
             "Update LyricsPlayer",
-            f"Update to v{result['latest_version']}?\n\nThe app will close and reopen automatically.",
+            f"Update to v{result['latest_version']}?\n\n"
+            f"The app will close to finish installing. Once it's done, "
+            f"open LyricsPlayer again to use the new version.",
         ):
             return
 
