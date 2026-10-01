@@ -9,9 +9,12 @@ always-on-top state kept in sync with the main window's pin button.
 """
 
 import re
+import webbrowser
 import tkinter as tk
 from config import *
 from log_viewer import apply_app_icon
+import update_checker
+from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
 
 _active_window = None  # the single open SettingsWindow, if any
 
@@ -249,11 +252,97 @@ class _SingleValueEntry(tk.Frame):
         self._on_commit(value)
 
 
+class _UpdateSection(tk.Frame):
+    """
+    Bottom-of-window section: current version, a button, and a short
+    status line.
+
+    The button is "Check for Update" by default. Clicking it checks
+    GitHub (bypassing the normal throttle, since this is a deliberate
+    user action) and shows "Checking...' while that's in flight. If a
+    newer release is found, the button switches to "Update to vX.Y.Z" -
+    clicking it opens the release page in the browser for now (actual
+    in-app download/install isn't built yet).
+    """
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, bg=ACCENT_COLOR, **kwargs)
+        self._latest_result = None
+
+        tk.Label(
+            self, text=f"Version {APP_VERSION}", font=(FONT_FAMILY, 10),
+            bg=ACCENT_COLOR, fg=COLOR_NEARBY_FG,
+        ).pack(anchor="w", padx=8, pady=(6, 4))
+
+        self._button = tk.Button(
+            self,
+            text="Check for Update",
+            font=(FONT_FAMILY, 9),
+            command=self._handle_click,
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            bg=COLOR_ACTIVE_FG,
+            fg=COLOR_FAR_FG,
+            activebackground=COLOR_FAR_FG,
+            activeforeground=COLOR_ACTIVE_FG,
+            padx=6,
+            pady=4,
+        )
+        self._button.pack(anchor="w", padx=8)
+        self._button.bind("<Enter>", lambda e: e.widget.configure(bg=COLOR_ARTIST_FG))
+        self._button.bind("<Leave>", lambda e: e.widget.configure(bg=COLOR_ACTIVE_FG))
+
+        self._status_label = tk.Label(
+            self, text="", font=(FONT_FAMILY, 9),
+            bg=ACCENT_COLOR, fg=COLOR_STATUS_FG,
+        )
+        self._status_label.pack(anchor="w", padx=8, pady=(4, 6))
+
+        update_checker.subscribe(self._on_result)
+        self.bind("<Destroy>", self._on_destroy)
+
+    def _on_result(self, result):
+        # Can fire from the background check thread - marshal onto the Tk main thread.
+        self.after(0, lambda: self._apply_result(result))
+
+    def _apply_result(self, result):
+        if not self.winfo_exists():
+            return
+        self._latest_result = result
+        if result is None:
+            self._button.configure(text="Check for Update", state="normal")
+            self._status_label.configure(text="")
+        elif result.get("available"):
+            self._button.configure(text=f"Update to v{result['latest_version']}", state="normal")
+            self._status_label.configure(text="A new version is available", fg=GOOD_COLOR)
+        elif result.get("latest_version"):
+            self._button.configure(text="Check for Update", state="normal")
+            self._status_label.configure(text="You're up to date", fg=COLOR_STATUS_FG)
+        else:
+            self._button.configure(text="Check for Update", state="normal")
+            self._status_label.configure(text="Couldn't check for updates", fg=ERROR_COLOR)
+
+    def _handle_click(self):
+        if self._latest_result and self._latest_result.get("available"):
+            url = self._latest_result.get("download_url") or (
+                f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+            )
+            webbrowser.open(url)
+            return
+        self._button.configure(text="Checking...", state="disabled")
+        self._status_label.configure(text="")
+        update_checker.check_now(force=True)
+
+    def _on_destroy(self, _event=None):
+        update_checker.unsubscribe(self._on_result)
+
+
 class SettingsWindow(tk.Toplevel):
     """Preferences window: window-size and font-size preset lists."""
 
     _WIDTH = 320
-    _HEIGHT = 560
+    _HEIGHT = 680  # grown to fit the Updates section - re-check if content ever changes
 
     def __init__(self, parent, current_window_size, current_font_sizes, current_default_offset,
                  on_window_size_change, on_font_size_change, on_default_offset_change):
@@ -323,6 +412,15 @@ class SettingsWindow(tk.Toplevel):
         )
         offset_row.pack(fill=tk.X, padx=12, pady=(0, 12))
         self._offset_row = offset_row
+
+        tk.Label(
+            self, text="Updates", font=(FONT_FAMILY, 11, "bold"),
+            bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
+        ).pack(anchor="w", padx=12, pady=(16, 4))
+
+        update_section = _UpdateSection(self)
+        update_section.pack(fill=tk.X, padx=12, pady=(0, 12))
+        self._update_section = update_section
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
