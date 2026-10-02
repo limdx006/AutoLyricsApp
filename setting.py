@@ -321,10 +321,10 @@ class _UpdateSection(tk.Frame):
             self._status_label.configure(text="")
         elif result.get("available"):
             self._button.configure(text=f"Update to v{result['latest_version']}", state="normal")
-            self._status_label.configure(text="A new version is available", fg=GOOD_COLOR)
+            self._status_label.configure(text="A new version is available", fg=ERROR_COLOR)
         elif result.get("latest_version"):
             self._button.configure(text="Check for Update", state="normal")
-            self._status_label.configure(text="You're up to date", fg=COLOR_STATUS_FG)
+            self._status_label.configure(text="You're up to date", fg=GOOD_COLOR)
         else:
             self._button.configure(text="Check for Update", state="normal")
             self._status_label.configure(text="Couldn't check for updates", fg=ERROR_COLOR)

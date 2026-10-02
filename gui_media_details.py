@@ -123,14 +123,46 @@ class MediaDetails(tk.Frame):
         )  # 📌 is U+1F4CC
         self.pin_button.configure(command=self._toggle_pin_top)
         self.is_pinned = False
-        self.settings_button = self.create_button(
-            "\u2699", 1, 2, sticky="n"
-        )  # ⚙ is U+2699
+
+        # Settings button sits in its own small container so an
+        # update-available badge can be overlaid on its top-left corner.
+        self._settings_container = tk.Frame(self, bg=ACCENT_COLOR)
+        self._settings_container.grid(row=1, column=2, padx=10, pady=10, sticky="n")
+        self.settings_button = tk.Button(
+            self._settings_container,
+            text="\u2699",  # ⚙ is U+2699
+            bg=ACCENT_COLOR,
+            fg=COLOR_ACTIVE_FG,
+            font=(FONT_FAMILY, 16),
+            borderwidth=0,
+            relief=tk.FLAT,
+            highlightthickness=0,
+            activebackground="#1e2e4a",
+            activeforeground=COLOR_ACTIVE_FG,
+        )
+        self.settings_button.pack()
+        self.settings_button.bind("<Enter>", lambda e: e.widget.configure(bg="#1e2e4a"))
+        self.settings_button.bind("<Leave>", lambda e: e.widget.configure(bg=ACCENT_COLOR))
         self.settings_button.configure(command=self._handle_open_settings)
+
+        self._update_badge = tk.Canvas(
+            self._settings_container, width=9, height=9,
+            bg=ACCENT_COLOR, highlightthickness=0, borderwidth=0,
+        )
+        self._update_badge.create_oval(0, 0, 9, 9, fill=ERROR_COLOR, outline="")
+        # Hidden by default - shown/hidden via set_update_badge_visible()
 
     def _handle_open_settings(self):
         if self._on_open_settings:
             self._on_open_settings()
+
+    def set_update_badge_visible(self, visible):
+        """Show/hide the small red dot on the settings gear's corner,
+        used to flag that a newer version is available."""
+        if visible:
+            self._update_badge.place(x=0, y=0)
+        else:
+            self._update_badge.place_forget()
 
     def _update_text_wraplength(self, event):
         """Keep media text wrapping aligned with the available middle-column width."""

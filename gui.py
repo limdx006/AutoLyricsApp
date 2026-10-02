@@ -13,6 +13,7 @@ from lyrics_translator import translate_lyrics
 from auto_nudge import trigger_auto_nudge
 from setting import open_settings_window
 import user_prefs
+import update_checker
 
 
 def _validate_window_size(value):
@@ -106,6 +107,7 @@ class LyricsApp:
 
         # API status strip - packed BOTTOM *before* the controls panel below,
         # so it lands at the true bottom edge and controls sits just above it
+        # (same-side pack widgets stack: first packed = outermost).
         self.api_status_bar = ApiStatusBar(self.root)
         self.api_status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -123,6 +125,21 @@ class LyricsApp:
         # Fetch lyrics for the initially detected song, if any
         if title and artist:
             self._fetch_lyrics_async(title, artist)
+
+        # Update-available badge on the settings gear
+        update_checker.subscribe(self._on_update_result)
+        self.root.bind("<Destroy>", self._on_root_destroy)
+        self.root.after(1000, lambda: update_checker.check_now())
+
+    def _on_update_result(self, result):
+        # Can fire from the background check thread - marshal onto the Tk main thread.
+        self.root.after(0, lambda: self.media_details.set_update_badge_visible(
+            bool(result and result.get("available"))
+        ))
+
+    def _on_root_destroy(self, event):
+        if event.widget is self.root:
+            update_checker.unsubscribe(self._on_update_result)
 
     def _handle_song_change(self, title, artist):
         """Called by ControlsPanel whenever the detected song changes."""
