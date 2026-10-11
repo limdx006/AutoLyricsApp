@@ -8,11 +8,15 @@ api_status.py's background health-check state:
     Offline       red dot
 
 Hovering the strip shows a short tooltip explaining the current state.
+Clicking it opens the API's own page in the browser.
 """
 
 import tkinter as tk
+import webbrowser
 from config import *
 import api_status
+
+API_URL = "https://limdxlyricsapi.onrender.com/"
 
 _STATUS_TEXT = {
     api_status.STATUS_ONLINE: "Online",
@@ -44,7 +48,8 @@ _CANVAS_SIZE = _DOT_SIZE + _DOT_MARGIN * 2
 
 
 class ApiStatusBar(tk.Frame):
-    """Very bottom strip: a small coloured dot + 'LimdxAPI: <state>' label."""
+    """Very bottom strip: a small coloured dot + 'LimdxAPI: <state>' label.
+    Clicking anywhere on it opens the API's own page in the browser."""
 
     _HEIGHT = 22
 
@@ -83,17 +88,21 @@ class ApiStatusBar(tk.Frame):
         )
         self.text_label.pack(side=tk.LEFT)
 
-        # Hover tooltip: bound on every part of the strip so the whole
-        # thing is a hover target, not just the text.
+        # Whole strip acts as one clickable + hoverable target.
         for widget in (self, inner, self.dot_canvas, self.text_label):
+            widget.configure(cursor="hand2")
             widget.bind("<Enter>", self._schedule_tooltip)
             widget.bind("<Leave>", self._on_leave)
+            widget.bind("<Button-1>", self._handle_click)
 
         # Subscribe to the background checker. Its callback can fire from
         # the checker thread, so the actual widget update is marshalled
         # onto the Tk main thread via after(0, ...).
         api_status.subscribe(self._on_status_changed)
         self.bind("<Destroy>", self._on_destroy)
+
+    def _handle_click(self, _event=None):
+        webbrowser.open(API_URL)
 
     def _on_status_changed(self, status):
         self.after(0, lambda: self._apply_status(status))
@@ -112,7 +121,7 @@ class ApiStatusBar(tk.Frame):
 
     def _tooltip_text(self):
         description = _STATUS_DESCRIPTION.get(self._current_status, "")
-        return f"LimdxAPI status\n{description}"
+        return f"LimdxAPI status\n{description}\n- Click to open the API page"
 
     def _schedule_tooltip(self, _event=None):
         """Show the tooltip after the pointer rests on the strip."""
@@ -143,7 +152,9 @@ class ApiStatusBar(tk.Frame):
         )
         self._tooltip_label.pack()
 
-        # This strip sits at the very bottom of the window
+        # This strip sits at the very bottom of the window, so the tooltip
+        # goes above it (not below, where it would fall off the screen edge),
+        # centered on the dot + label and kept fully on-screen.
         tooltip.update_idletasks()
         tip_w, tip_h = tooltip.winfo_reqwidth(), tooltip.winfo_reqheight()
         x = self._inner.winfo_rootx() + (self._inner.winfo_width() - tip_w) // 2
