@@ -9,3 +9,4 @@ Qwen.md
 todo.md
 /build
 *.spec
+/venv

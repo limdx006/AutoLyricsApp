@@ -1,0 +1,21 @@
+# LyricsPlayer dependencies
+# Windows-only app (winsdk requires the Windows Media Session API)
+
+# --- Core ---
+winsdk              # Windows Media Transport Controls (play/pause/next/prev, now-playing info)
+syncedlyrics        # Fetches timestamped LRC lyrics
+requests            # Used directly by request_api.py, and as syncedlyrics' transitive HTTP client
+
+# --- Japanese -> Romaji ---
+cutlet              # Japanese text -> Hepburn romaji
+fugashi             # Japanese morphological analysis (cutlet's tokenizer)
+unidic-lite         # Compact Japanese dictionary (required by fugashi)
+
+# --- Chinese -> Pinyin ---
+pypinyin
+
+# --- Korean -> Romaja ---
+korean-romanizer
+
+# --- Packaging ---
+pyinstaller         # Only needed to run build_exe.py; omit if you're not building the .exe yourself
