@@ -70,7 +70,7 @@ def lyrics_fetcher(title, artist, session=None):
     # MyLyricsAPI failed/not found then use syncedlyrics
     for attempt in range(MAX_ATTEMPT):
         try:
-            lyrics = syncedlyrics.search(query, synced_only = True)
+            lyrics = syncedlyrics.search(query, synced_only = True, enhanced = False)
             cleaned = remove_empty_lines(lyrics)
             print(f"[Lyrics] Retrieved lyrics for '{query}' with {len(cleaned.splitlines())} lines")
             time.sleep(0.5)  # Give the media player a moment to update its state
