@@ -26,6 +26,11 @@ class MediaDetails(tk.Frame):
         # what future song-changes reset to, without touching the offset
         # currently in effect for whatever song is playing right now.
         self._default_offset = DEFAULT_OFFSET
+        # Rescaled by set_title_font_sizes() when the window size changes,
+        # so a small window doesn't reserve the same title height as the
+        # default and crowd the lyrics area below it.
+        self._title_font_size = 16
+        self._artist_font_size = 10
 
         # Fixed height = 30% of window height
         self.configure(height=int(WINDOW_HEIGHT * 0.3))
@@ -66,7 +71,7 @@ class MediaDetails(tk.Frame):
         self.song_name_label = tk.Label(
             middle_frame,
             text=title,
-            font=(FONT_FAMILY, 16, "bold"),
+            font=(FONT_FAMILY, self._title_font_size, "bold"),
             bg=ACCENT_COLOR,
             fg=COLOR_ACTIVE_FG,
             wraplength=int(WINDOW_WIDTH * 0.65),
@@ -77,7 +82,7 @@ class MediaDetails(tk.Frame):
         self.artist_name_label = tk.Label(
             middle_frame,
             text=artist,
-            font=(FONT_FAMILY, 10),
+            font=(FONT_FAMILY, self._artist_font_size),
             bg=ACCENT_COLOR,
             fg=COLOR_NEARBY_FG,
             wraplength=int(WINDOW_WIDTH * 0.65),
@@ -155,6 +160,17 @@ class MediaDetails(tk.Frame):
     def _handle_open_settings(self):
         if self._on_open_settings:
             self._on_open_settings()
+
+    def set_title_font_sizes(self, title_size, artist_size):
+        """Rescale the song title/artist labels - called when the window
+        size preset changes, so a small window doesn't reserve the same
+        title height as the default and crowd out the lyrics area."""
+        if (title_size, artist_size) == (self._title_font_size, self._artist_font_size):
+            return
+        self._title_font_size = title_size
+        self._artist_font_size = artist_size
+        self.song_name_label.configure(font=(FONT_FAMILY, title_size, "bold"))
+        self.artist_name_label.configure(font=(FONT_FAMILY, artist_size))
 
     def set_update_badge_visible(self, visible):
         """Show/hide the small red dot on the settings gear's corner,

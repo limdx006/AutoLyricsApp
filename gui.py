@@ -39,6 +39,24 @@ def _validate_font_sizes(value):
     return None
 
 
+_TITLE_FONT_BASE = 16  # matches the size at WINDOW_WIDTH (the Default preset)
+_ARTIST_FONT_BASE = 10
+_TITLE_FONT_MIN, _TITLE_FONT_MAX = 12, 22
+_ARTIST_FONT_MIN, _ARTIST_FONT_MAX = 8, 14
+
+
+def _scaled_title_fonts(window_width):
+    """Scale the song title/artist font sizes to the window's width,
+    relative to WINDOW_WIDTH (the Default preset) - a smaller window gets
+    a smaller title so it doesn't crowd the lyrics area, a larger one
+    gets a bigger title to match. Works for any width, not just the
+    preset list, so a custom size scales smoothly too."""
+    scale = window_width / WINDOW_WIDTH
+    title = max(_TITLE_FONT_MIN, min(_TITLE_FONT_MAX, round(_TITLE_FONT_BASE * scale)))
+    artist = max(_ARTIST_FONT_MIN, min(_ARTIST_FONT_MAX, round(_ARTIST_FONT_BASE * scale)))
+    return title, artist
+
+
 def _validate_offset(value):
     try:
         offset = float(value)
@@ -57,7 +75,9 @@ class LyricsApp:
         self._current_raw_lyrics = None
         self._translated_lyrics_cache = None
         # Tracked so the settings window knows which presets are currently selected and can highlight them accordingly
-        # Restored from the saved preferences file when available
+        # Restored from the saved preferences file when available (see
+        # user_prefs.py) - falls back to config.py's defaults on a first
+        # launch, or if a saved value is missing/invalid.
         saved_prefs = user_prefs.load()
         self._current_window_size = (
             _validate_window_size(saved_prefs.get("window_size")) or (WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -84,6 +104,8 @@ class LyricsApp:
             on_refresh=self._handle_manual_refresh,
         )
         self.media_details.pack(side=tk.TOP, fill=tk.X)
+        title_size, artist_size = _scaled_title_fonts(self._current_window_size[0])
+        self.media_details.set_title_font_sizes(title_size, artist_size)
 
         # Language bar area (10% below media details area)
         self.language_bar = LanguageBar(self.root, on_translate_toggle=self._handle_translate_toggle)
@@ -94,11 +116,15 @@ class LyricsApp:
         self.lyrics_display.pack(
             side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(5, 10)
         )
-        # Apply the saved default offset now that lyrics_display exists
+        # Apply the saved default offset now that lyrics_display exists -
+        # reset_offset() fires media_details' on_offset_change callback,
+        # which looks up self.lyrics_display, so this can't happen any
+        # earlier than this point.
         self.media_details.set_default_offset(self._current_default_offset)
         self.media_details.reset_offset()
         self.lyrics_display.set_offset(self.media_details.get_offset())
-        # Apply the saved font sizes
+        # Apply the saved font sizes too - no lyrics are loaded yet, so
+        # this only primes the sizes for when set_lyrics() first runs.
         self.lyrics_display.set_font_sizes(
             self._current_font_sizes["active"],
             self._current_font_sizes["nearby"],
@@ -126,7 +152,9 @@ class LyricsApp:
         if title and artist:
             self._fetch_lyrics_async(title, artist)
 
-        # Update-available badge on the settings gear
+        # Update-available badge on the settings gear, reflecting
+        # update_checker's result. A single check runs once, shortly after
+        # startup has settled - not on every poll/loop in this app.
         update_checker.subscribe(self._on_update_result)
         self.root.bind("<Destroy>", self._on_root_destroy)
         self.root.after(1000, lambda: update_checker.check_now())
@@ -224,6 +252,8 @@ class LyricsApp:
         self._current_window_size = size
         width, height = size
         self.root.geometry(f"{width}x{height}")
+        title_size, artist_size = _scaled_title_fonts(width)
+        self.media_details.set_title_font_sizes(title_size, artist_size)
         user_prefs.save({"window_size": list(size)})
 
     def _apply_font_sizes(self, sizes):
