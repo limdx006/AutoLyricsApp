@@ -57,6 +57,21 @@ def _scaled_title_fonts(window_width):
     return title, artist
 
 
+def _validate_title_font_pref(value):
+    """Returns (mode, custom_dict_or_None) for the saved title-font
+    preference. Falls back to ("auto", None) for anything missing or
+    invalid, including a "custom" mode whose saved sizes are out of range."""
+    try:
+        if value.get("mode") == "custom":
+            title = int(value["title"])
+            artist = int(value["artist"])
+            if _TITLE_FONT_MIN <= title <= _TITLE_FONT_MAX and _ARTIST_FONT_MIN <= artist <= _ARTIST_FONT_MAX:
+                return "custom", {"title": title, "artist": artist}
+    except (TypeError, ValueError, KeyError, AttributeError):
+        pass
+    return "auto", None
+
+
 def _validate_offset(value):
     try:
         offset = float(value)
@@ -88,6 +103,7 @@ class LyricsApp:
             "far": LyricsDisplay.FONT_SIZE_FAR_DEFAULT,
         }
         self._current_default_offset = _validate_offset(saved_prefs.get("default_offset")) or DEFAULT_OFFSET
+        self._title_font_mode, self._title_font_custom = _validate_title_font_pref(saved_prefs.get("title_font"))
         self.root.title("Lyrics Player")
         self.root.geometry(f"{self._current_window_size[0]}x{self._current_window_size[1]}")
         self.root.resizable(False, False)
@@ -104,7 +120,10 @@ class LyricsApp:
             on_refresh=self._handle_manual_refresh,
         )
         self.media_details.pack(side=tk.TOP, fill=tk.X)
-        title_size, artist_size = _scaled_title_fonts(self._current_window_size[0])
+        if self._title_font_mode == "custom" and self._title_font_custom:
+            title_size, artist_size = self._title_font_custom["title"], self._title_font_custom["artist"]
+        else:
+            title_size, artist_size = _scaled_title_fonts(self._current_window_size[0])
         self.media_details.set_title_font_sizes(title_size, artist_size)
 
         # Language bar area (10% below media details area)
@@ -242,9 +261,12 @@ class LyricsApp:
             current_window_size=self._current_window_size,
             current_font_sizes=self._current_font_sizes,
             current_default_offset=self._current_default_offset,
+            current_title_font_mode=self._title_font_mode,
+            current_title_font_custom=self._title_font_custom,
             on_window_size_change=self._apply_window_size,
             on_font_size_change=self._apply_font_sizes,
             on_default_offset_change=self._apply_default_offset,
+            on_title_font_change=self._apply_title_font_change,
         )
 
     def _apply_window_size(self, size):
@@ -252,9 +274,27 @@ class LyricsApp:
         self._current_window_size = size
         width, height = size
         self.root.geometry(f"{width}x{height}")
-        title_size, artist_size = _scaled_title_fonts(width)
-        self.media_details.set_title_font_sizes(title_size, artist_size)
+        # Only auto-rescale the title if the user hasn't pinned it to a
+        # Custom size - Custom should stay fixed regardless of window size.
+        if self._title_font_mode == "auto":
+            title_size, artist_size = _scaled_title_fonts(width)
+            self.media_details.set_title_font_sizes(title_size, artist_size)
         user_prefs.save({"window_size": list(size)})
+
+    def _apply_title_font_change(self, value):
+        """Called from Settings: value is "auto" (the Auto preset) or an
+        (title_size, artist_size) tuple from the Custom row."""
+        if value == "auto":
+            self._title_font_mode = "auto"
+            self._title_font_custom = None
+            title_size, artist_size = _scaled_title_fonts(self._current_window_size[0])
+            user_prefs.save({"title_font": {"mode": "auto"}})
+        else:
+            title_size, artist_size = value
+            self._title_font_mode = "custom"
+            self._title_font_custom = {"title": title_size, "artist": artist_size}
+            user_prefs.save({"title_font": {"mode": "custom", "title": title_size, "artist": artist_size}})
+        self.media_details.set_title_font_sizes(title_size, artist_size)
 
     def _apply_font_sizes(self, sizes):
         """Called when a font-size preset is selected in the settings window."""

@@ -431,10 +431,12 @@ class SettingsWindow(tk.Toplevel):
     """Preferences window: window-size and font-size preset lists."""
 
     _WIDTH = 320
-    _HEIGHT = 680  # grown to fit the Updates section - re-check if content ever changes
+    _HEIGHT = 760  # grown to fit the Title Font Size + Updates sections - re-check if content ever changes
 
     def __init__(self, parent, current_window_size, current_font_sizes, current_default_offset,
-                 on_window_size_change, on_font_size_change, on_default_offset_change):
+                 current_title_font_mode, current_title_font_custom,
+                 on_window_size_change, on_font_size_change, on_default_offset_change,
+                 on_title_font_change):
         super().__init__(parent)
         self.title("Settings")
         self.resizable(False, False)
@@ -467,6 +469,40 @@ class SettingsWindow(tk.Toplevel):
         size_custom.pack(fill=tk.X, padx=12)
         size_list._on_activate = lambda: size_custom.set_selected(False)
         self._size_list, self._size_custom = size_list, size_custom
+
+        tk.Label(
+            self, text="Title Font Size ['Title' | 'Artist']", font=(FONT_FAMILY, 11, "bold"),
+            bg=BG_COLOR, fg=COLOR_ACTIVE_FG,
+        ).pack(anchor="w", padx=12, pady=(16, 4))
+
+        # "Auto" is a single-row preset list (same bullet/highlight style
+        # as the other sections) so it reads consistently, even though
+        # there's only one option here: it scales with the window size.
+        title_font_list = _PresetList(
+            self, [("Auto - scales with window size", "auto")],
+            0 if current_title_font_mode == "auto" else -1,
+            on_select=on_title_font_change,
+        )
+        title_font_list.pack(fill=tk.X, padx=12)
+        title_font_custom_initial = (
+            (current_title_font_custom["title"], current_title_font_custom["artist"])
+            if current_title_font_custom else (16, 10)
+        )
+        title_font_custom = _CustomEntryRow(
+            # Bounds must match gui.py's _TITLE_FONT_MIN/MAX and
+            # _ARTIST_FONT_MIN/MAX - kept separate here to avoid a
+            # circular import (gui.py already imports this module).
+            self, "Custom -", field_count=2, separator=" / ", value_range=((12, 22), (8, 14)),
+            initial_values=title_font_custom_initial,
+            on_commit=on_title_font_change,
+            on_activate=lambda: title_font_list.deselect_all(),
+            field_width=3,
+        )
+        title_font_custom.pack(fill=tk.X, padx=12)
+        title_font_list._on_activate = lambda: title_font_custom.set_selected(False)
+        if current_title_font_mode == "custom":
+            title_font_custom.set_selected(True)
+        self._title_font_list, self._title_font_custom = title_font_list, title_font_custom
 
         tk.Label(
             self, text="Lyric Font Size ['Active' | 'Nearby' | 'Far']", font=(FONT_FAMILY, 11, "bold"),
@@ -547,7 +583,9 @@ class SettingsWindow(tk.Toplevel):
 
 
 def open_settings_window(parent, current_window_size, current_font_sizes, current_default_offset,
-                          on_window_size_change, on_font_size_change, on_default_offset_change):
+                          current_title_font_mode, current_title_font_custom,
+                          on_window_size_change, on_font_size_change, on_default_offset_change,
+                          on_title_font_change):
     """Open the settings window, or close it (same as clicking its own close
     button/cross) if it's already open - lets the ⚙ button act as a toggle."""
     global _active_window
@@ -556,7 +594,9 @@ def open_settings_window(parent, current_window_size, current_font_sizes, curren
         return None
     _active_window = SettingsWindow(
         parent, current_window_size, current_font_sizes, current_default_offset,
+        current_title_font_mode, current_title_font_custom,
         on_window_size_change, on_font_size_change, on_default_offset_change,
+        on_title_font_change,
     )
     return _active_window
 
