@@ -26,6 +26,10 @@ from log_viewer import install_log_capture, apply_app_icon, configure_taskbar_id
 import api_status
 
 install_log_capture()  # tee stdout/stderr into the log buffer as early as possible
+
+from process_priority import lower_priority
+lower_priority()
+
 api_status.start()  # begin polling LimdxAPI health in the background immediately
 
 

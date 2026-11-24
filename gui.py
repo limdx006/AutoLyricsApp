@@ -213,6 +213,7 @@ class LyricsApp:
                     title,
                     artist,
                     session=selected_session,
+                    is_current=lambda: my_generation == self._lyrics_fetch_generation,
                 )
             except Exception as e:
                 print(f"Lyrics fetch failed: {e}")
