@@ -2,7 +2,7 @@
 App version and GitHub release metadata, used by update_checker.py.
 """
 
-APP_VERSION = "4.1.3"
+APP_VERSION = "4.1.4"
 
 GITHUB_OWNER = "limdx006"
 GITHUB_REPO = "AutoLyricsApp"
