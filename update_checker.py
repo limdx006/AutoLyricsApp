@@ -47,6 +47,17 @@ def _is_newer(latest, current):
     return latest > current
 
 
+def _refresh_version_status(result):
+    """Recalculate a saved result's availability against this app version."""
+    result = dict(result)
+    result["current_version"] = APP_VERSION
+    result["available"] = _is_newer(
+        _parse_version(result.get("latest_version")),
+        _parse_version(APP_VERSION),
+    )
+    return result
+
+
 def get_result():
     """Return the last known check result (see _run_check for the dict
     shape), or None if no check has completed yet this run."""
@@ -125,6 +136,7 @@ def _run_check():
         "available": _is_newer(latest, current),
         "checked_at": time.time(),
     }
+    result = _refresh_version_status(result)
     user_prefs.save({"last_update_check": result})
     status = "update available" if result["available"] else "up to date"
     print(f"[Update] v{APP_VERSION} vs latest {tag_name or 'unknown'} - {status}")
@@ -141,6 +153,7 @@ def check_now(force=False):
     """
     cached = user_prefs.load().get("last_update_check")
     if cached:
+        cached = _refresh_version_status(cached)
         _set_result(cached)
     if not force and cached and time.time() - cached.get("checked_at", 0) < _MIN_RECHECK_INTERVAL:
         return
